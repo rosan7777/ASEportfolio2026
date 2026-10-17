@@ -1,0 +1,54 @@
+{
+  "metadata": [
+    {
+      "src": [
+        {
+          "src": "01Assignment1_AIprogramming_3DstarChart",
+          "files": [
+            "**/*.csproj"
+          ],
+          "exclude": [
+            "**/bin/**",
+            "**/obj/**"
+          ]
+        },
+        {
+          "src": "02Assignment2_BOOSE_ProgrammingLanguage",
+          "files": [
+            "**/*.csproj"
+          ],
+          "exclude": [
+            "**/bin/**",
+            "**/obj/**"
+          ]
+        }
+      ],
+      "dest": "api"
+    }
+  ],
+  "build": {
+    "content": [
+      {
+        "files": [
+          "api/*.{md,yml}",
+          "**/*.md",
+          "toc.yml"
+        ],
+        "exclude": [
+          "docs/**"
+        ]
+      }
+    ],
+    "output": "docs",
+    "template": [
+      "default",
+      "modern"
+    ],
+    "globalMetadata": {
+      "_appName": "[put my name here] Advanced Software Engineering Portfolio",
+      "_appTitle": "Assignment Documentation",
+      "_enableSearch": true,
+      "_disableContribution": true
+    }
+  }
+}
