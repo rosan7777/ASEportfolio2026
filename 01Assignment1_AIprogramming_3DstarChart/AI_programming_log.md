@@ -107,3 +107,6 @@ cannot be changed. I built it again and it still compiles with 0 errors.
 
 ### Commit
 Fix Star.cs: use init instead of set so star data cannot change after loading
+
+Note: the first commit of this fix only included the log, because Star.cs was not saved.
+   The Star.cs change itself is in the next commit.
