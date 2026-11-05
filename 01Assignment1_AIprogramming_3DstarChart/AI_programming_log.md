@@ -52,3 +52,40 @@ crash. The distances are in parsecs, not light years, so I need to convert them 
 
 ### Commit
 Add stars.csv: 2000 nearest stars from HYG v4.4, copied to output on build
+
+
+---
+## Entry 2 – 2026-11-05, 04:51 – feature1-create-star-chart
+### Prompt
+Context: I chose Option A (Star.cs only holds data, StarCollection.cs reads the file). I asked Claude:
+
+> just keep that things are required in this. only do that things that are told us to do,
+> as i provide you everything for this project, so you better know these things
+
+### Response
+Claude mapped each requirement in the spec and demo form to the fields it needs:
+- Feature 1, read star data: Id
+- Feature 1, catalogue names for unnamed stars: Bayer, Flamsteed, Constellation, Gliese, Hipparcos, HenryDraper
+- Feature 2, names and the proper-name filter: ProperName
+- Feature 2, spectral class colour: SpectralType
+- Feature 2/3, 3D position, bearing and path: X, Y, Z
+- Feature 3, distance in light years: Distance (parsecs in the file)
+
+It left out magnitude, colour index, luminosity and multiple-star data because the spec does not
+require them. It said which catalogue IDs to use for unnamed stars must be checked with the
+astronomy chat first. It could not compile the code itself (no .NET in its workspace).
+
+Code produced: see Star.cs in this commit (13 properties with XML comments, strings default to
+string.Empty, catalogue numbers stored as strings).
+
+### Critique
+### Critique
+The AI could not run its own code, so I built it myself in Visual Studio and it worked
+with 0 errors. I told the AI to only add what the assignment needs, and it explained why
+it chose each field, so I could check it against the spec.
+
+But I found one problem. Every property uses "set", so any part of my program could change
+a star's data by mistake after it is loaded. "init" would be safer. Also, Distance is in
+parsecs, so I must change it to light years later for Feature 3.
+### Commit
+Add Star.cs data class with fields needed for Features 1-3
