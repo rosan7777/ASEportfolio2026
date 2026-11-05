@@ -78,7 +78,7 @@ astronomy chat first. It could not compile the code itself (no .NET in its works
 Code produced: see Star.cs in this commit (13 properties with XML comments, strings default to
 string.Empty, catalogue numbers stored as strings).
 
-### Critique
+
 ### Critique
 The AI could not run its own code, so I built it myself in Visual Studio and it worked
 with 0 errors. I told the AI to only add what the assignment needs, and it explained why
@@ -89,3 +89,21 @@ a star's data by mistake after it is loaded. "init" would be safer. Also, Distan
 parsecs, so I must change it to light years later for Feature 3.
 ### Commit
 Add Star.cs data class with fields needed for Features 1-3
+
+
+
+---
+## Entry 3 – 2026-11-05 – feature1-create-star-chart
+### Prompt
+No AI used. This is a manual fix of a defect I found in the AI's Star.cs (see Entry 2 critique).
+
+### Change
+Changed all 13 properties in Star.cs from `{ get; set; }` to `{ get; init; }`.
+
+### Critique
+With "set", any part of the program could change a star's data after loading. With "init",
+the values can only be set once, when the star is created from the file. After that they
+cannot be changed. I built it again and it still compiles with 0 errors.
+
+### Commit
+Fix Star.cs: use init instead of set so star data cannot change after loading
