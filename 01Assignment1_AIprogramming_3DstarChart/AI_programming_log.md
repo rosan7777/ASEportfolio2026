@@ -149,3 +149,36 @@ stars. I will check that in the next commit.
 
 ### Commit
 Add StarCollection.cs: load stars.csv into a list of Star objects
+
+
+
+---
+## Entry 5 – 2026-11-05, 23:19 – feature1-create-star-chart
+### Prompt
+> In MainWindow.xaml.cs, when the window opens, load stars.csv with StarCollection. Show the number
+> of stars loaded in the window title. Also write the count and the first 3 stars (id, name,
+> distance) to the Visual Studio Output window, so I can show the data loading in my demo. If
+> loading fails, show an error message instead of crashing. Don't draw any stars yet; that's Feature 2.
+
+### Response
+Claude first checked the file: the first 3 stars should be Sol (0.0), Proxima Centauri (1.2959) and
+Toliman (1.3248). It then wrote MainWindow.xaml.cs (see this commit):
+- loads stars in the window's Loaded event, from the folder the .exe runs in
+- title shows "Star Chart 3D - N stars loaded"
+- Debug.WriteLine prints the count and first 3 stars
+- catches only IOException, InvalidDataException and UnauthorizedAccessException and shows a
+  MessageBox; other errors still crash so real bugs are not hidden
+- removed 10 unused template using lines; wrote System.IO.Path in full because
+  System.Windows.Shapes also has a Path class
+
+### Critique
+I tested it myself. The window title says 2000 stars loaded and the Output window shows Sol,
+Proxima Centauri and Toliman with the right distances, so StarCollection works. This is the
+test I said I would do in Entry 4.
+
+The AI caught a hidden problem: the template had "using System.Windows.Shapes", which has its
+own Path class that clashes with System.IO.Path. It only catches 3 kinds of error on purpose,
+so other bugs still show up. The distance is still in parsecs, which I fix in Feature 3.
+
+### Commit
+Load stars on window open and show the count in the title and Output window
