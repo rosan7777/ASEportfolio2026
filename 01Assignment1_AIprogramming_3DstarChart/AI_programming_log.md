@@ -110,3 +110,42 @@ Fix Star.cs: use init instead of set so star data cannot change after loading
 
 Note: the first commit of this fix only included the log, because Star.cs was not saved.
    The Star.cs change itself is in the next commit.
+
+
+---
+## Entry 4 – 2026-11-05, 23:11 – feature1-create-star-chart
+### Prompt
+> create StarCollection.cs in the StarChart3D namespace. It should hold a List of Star objects and
+> have a method Load(string filePath) that reads stars.csv. The file has a header line to skip,
+> 37 columns, and values in quotes that must have the " removed. Some fields are blank, so parsing
+> must not crash on them. Use the column numbers: id 0, hip 1, hd 2, gl 4, proper 6, dist 9, x 17,
+> y 18, z 19, spect 15, bayer 27, flam 28, con 29. Also add a Count property. Don't generate
+> catalogue names yet; that's a separate step. Add XML comments.
+
+### Response
+Claude first checked the real file: id, dist, x, y, z are never blank and are plain numbers; blank
+and quoted values ("" and "10") only appear in text columns. It then wrote StarCollection.cs
+(see this commit):
+- column numbers stored as named constants (ColId, ColDist, ...)
+- Load() clears old stars, skips the header, splits each line on ',', checks for 37 columns
+- text fields: spaces and " removed, blank becomes empty string
+- required numbers (id, dist, x, y, z) parsed with CultureInfo.InvariantCulture; if invalid it
+  throws InvalidDataException with the line number instead of using 0
+- Stars is IReadOnlyList so other classes cannot change the list; Count property added
+
+It pointed out it changed my request: a blank required number throws an error instead of "not
+crashing", because using 0 would put the star at the Sun's position. It also said Split(',') only
+works because no value contains a comma, and that it could not compile the code.
+
+### Critique
+The AI did not do exactly what I asked. I said blank fields must not crash, but it made the
+code throw an error if a needed number like x or dist is blank. I agree with this, because
+using 0 would put the star at the Sun and that bug would be hard to see. In my file these
+columns are never blank, so it is safe.
+
+Splitting on "," is a weak point. It only works because no value in my file has a comma.
+I built the project and it compiles, but I have not tested yet that it really loads 2000
+stars. I will check that in the next commit.
+
+### Commit
+Add StarCollection.cs: load stars.csv into a list of Star objects
