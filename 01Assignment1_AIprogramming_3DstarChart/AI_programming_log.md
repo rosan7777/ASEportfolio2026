@@ -182,3 +182,40 @@ so other bugs still show up. The distance is still in parsecs, which I fix in Fe
 
 ### Commit
 Load stars on window open and show the count in the title and Output window
+
+
+---
+## Entry 6 – 2026-11-05, 23:44 – feature1-create-star-chart
+### Prompt
+> Create a new class CatalogueNames in the StarChart3D namespace with a method that returns the
+> display name for a Star, using the order of preference from my domain expert: proper name, then
+> Bayer + constellation (Greek symbol, e.g. "τ Cet"; numbers like "Kap-1" become a superscript,
+> e.g. "κ¹ Scl"), then Flamsteed + constellation (e.g. "52 Cet"), then Gliese as it is, then
+> "HD " + number, then "HIP " + number, then "HYG " + id. Use short constellation abbreviations,
+> not full names. Leave HR out. If a Bayer value is not a Greek abbreviation (my data has "p"),
+> show it as it is. Don't change Star.cs or StarCollection.cs. Add XML comments.
+
+### Response
+Claude first ran the same rules on my stars.csv to show what correct output looks like:
+Sol, Proxima Centauri, τ Cet (id 8087, Tau Ceti), κ¹ Cet (id 15419), p Eri (id 7736).
+It found that 5 pairs of binary stars get the same name, for example "61 Cyg" for both
+Gl 820A and Gl 820B, because Bayer and Flamsteed come before Gliese and only Gliese has the A/B.
+It did not fix this because the order was my decision.
+
+It then wrote CatalogueNames.cs (see this commit): a static class with GetDisplayName(Star),
+a Greek letter table, and a superscript helper. Differences from the domain expert's sketch:
+it uses my real property names, and non-digit characters in a superscript are kept instead of
+crashing.
+
+### Critique
+The code builds and the app runs. The AI's first version from my domain expert would not
+have compiled, because it used the wrong property names, but this one uses mine. The
+superscript code is also safer, because a non-digit can no longer crash it.
+
+The big problem is that 5 pairs of binary stars get the same name, like 61 Cyg A and B both
+showing "61 Cyg". This comes from the order of preference I chose, not from a bug in the
+code. I will fix it in a separate commit. I have not tested the names in the app yet, so I
+will do that next.
+
+### Commit
+Add CatalogueNames: generate catalogue names for stars without proper names

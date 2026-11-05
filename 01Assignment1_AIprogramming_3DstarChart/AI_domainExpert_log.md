@@ -1,5 +1,5 @@
 # AI Domain Expert Log (Astronomy)
-AI used:  (claude.ai), in a separate chat used only for astronomy questions,
+AI used: Claude Opus 5.5 (claude.ai), in a separate chat used only for astronomy questions,
 not the chat I use for programming
 
 ---
