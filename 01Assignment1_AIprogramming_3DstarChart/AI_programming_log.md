@@ -335,3 +335,35 @@ mode, which is fine for this project.
 
 ### Commit
 Add HelixToolkit.Core.Wpf 2.27.3 for 3D rendering
+
+
+
+---
+## Entry 10 – 2026-11-06, 02:06 – feature2-visualising-star-chart
+### Prompt
+> In MainWindow.xaml, add a HelixToolkit HelixViewport3D called StarViewport that fills the
+> window. Give it a black background, a perspective camera looking towards the Sun at (0,0,0),
+> and default lighting. Make the window bigger (1200 by 800) and keep the existing title code
+> working. Don't draw any stars yet; that's the next step.
+
+### Response
+Claude replaced MainWindow.xaml (see this commit):
+- added xmlns:h="http://helix-toolkit.org/wpf" and a HelixViewport3D named StarViewport,
+  Background Black, with the coordinate system arrows and view cube shown
+- PerspectiveCamera at (0,0,30) looking at (0,0,0), because the furthest star is about
+  20.5 parsecs away, so all stars will fit; near plane 0.01, far plane 1000
+- DefaultLights; window 1200 x 800; MainWindow.xaml.cs not changed
+It said it was not 100% sure the Core package uses the same xmlns address, and that the build
+would confirm it.
+
+### Critique
+It works: the window is black and 1200 x 800, the title still shows 2000 stars loaded, and I
+can rotate the view with the right mouse button. The AI was honest that it was not sure about
+the xmlns address for the Core package, so I checked it by building and running.
+
+The coordinate arrows are useful now because there is nothing else to see, but I might remove
+them later. The camera distance of 30 is based on my data, but if I changed stars.csv it would
+need changing too, so a fixed number is a weak point.
+
+### Commit
+Add black 3D HelixViewport3D with camera looking at the Sun
