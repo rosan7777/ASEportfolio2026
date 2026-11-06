@@ -5,7 +5,7 @@ using System.Windows;
 namespace StarChart3D
 {
     /// <summary>
-    /// The main window. Loads the star data when it opens.
+    /// The main window. Loads the star data when it opens and draws it in 3D.
     /// </summary>
     public partial class MainWindow : Window
     {
@@ -29,8 +29,8 @@ namespace StarChart3D
         }
 
         /// <summary>
-        /// Runs when the window has opened: loads the stars, shows the count in the title,
-        /// draws the stars, and writes the count and the first 3 stars to the Output window.
+        /// Runs when the window has opened: loads the stars, draws them, and writes the count,
+        /// the first 3 stars and the tests to the Output window.
         /// If loading fails, an error message is shown instead of crashing.
         /// </summary>
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
@@ -52,9 +52,7 @@ namespace StarChart3D
                 return;
             }
 
-            // Filter turned on for testing; an on/off switch comes in the next commit.
-            int starsDrawn = starRenderer.Draw(starCollection, onlyProperNames: true);
-            Title = $"Star Chart 3D - {starCollection.Count} stars loaded, {starsDrawn} shown";
+            RedrawStars();
 
             Debug.WriteLine($"Loaded {starCollection.Count} stars from {filePath}");
             for (int i = 0; i < 3 && i < starCollection.Count; i++)
@@ -66,6 +64,25 @@ namespace StarChart3D
 
             WriteCatalogueNameTest();
             WriteSpectralColourTest();
+        }
+
+        /// <summary>
+        /// Draws the stars again, using the filter checkbox to decide whether only stars with a
+        /// proper name are shown, and shows how many stars are drawn in the title.
+        /// </summary>
+        private void RedrawStars()
+        {
+            bool onlyProperNames = ProperNameFilterCheckBox.IsChecked == true;
+            int starsDrawn = starRenderer.Draw(starCollection, onlyProperNames);
+            Title = $"Star Chart 3D - {starCollection.Count} stars loaded, {starsDrawn} shown";
+        }
+
+        /// <summary>
+        /// Runs when the "Only show stars with a proper name" checkbox is ticked or unticked.
+        /// </summary>
+        private void ProperNameFilterCheckBox_Changed(object sender, RoutedEventArgs e)
+        {
+            RedrawStars();
         }
 
         /// <summary>

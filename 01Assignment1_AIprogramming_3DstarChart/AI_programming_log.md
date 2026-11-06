@@ -516,3 +516,37 @@ really old Gould numbers like "268 G. Cet", so the filter counts them as named s
 
 ### Commit
 Add filter to draw only stars with a proper name (StarRenderer.Draw)
+
+
+
+---
+## Entry 15 – 2026-11-06, 03:09 – feature2-visualising-star-chart
+### Prompt
+> Add a checkbox in the top-left corner of the window, on top of the 3D view, labelled "Only show
+> stars with a proper name". When it is ticked, redraw with the filter on; when it is unticked,
+> show all stars. Start with it unticked. Update the title with how many stars are shown each time
+> it changes. Make the checkbox text readable on the black background. Don't change StarRenderer
+> or the other classes.
+
+### Response
+Claude changed (see this commit):
+- MainWindow.xaml: a Border in the top-left with a dark see-through background (#B0202020) holding
+  a white CheckBox "Only show stars with a proper name", unticked at start, Focusable="False"
+- MainWindow.xaml.cs: new RedrawStars() reads the checkbox, calls StarRenderer.Draw and sets the
+  title; new ProperNameFilterCheckBox_Changed() calls RedrawStars() when it is ticked or unticked
+It said it made the checkbox not focusable so the space key will not tick it once keyboard
+controls are added, but that this means it can only be switched with the mouse.
+
+Result: unticked = "2000 stars loaded, 2000 shown", ticked = "2000 stars loaded, 89 shown".
+
+### Critique
+The filter is now switchable, which the demo form asks for. Ticking shows 89 stars and unticking
+shows all 2000, and the title updates every time, so it is easy to prove in the demo. The checkbox
+is readable because of the dark panel behind it.
+
+With all 2000 stars the labels are far too crowded to read, so a later commit could turn labels on
+and off. The AI made the checkbox not focusable, which helps the keyboard controls I add next, but
+it means you cannot use the keyboard to tick it, which is worse for accessibility.
+
+### Commit
+Add switchable filter checkbox for stars with a proper name

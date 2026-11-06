@@ -28,6 +28,22 @@
             <!-- Standard lighting so 3D shapes are visible. -->
             <h:DefaultLights />
         </h:HelixViewport3D>
+
+        <!-- Controls panel in the top-left corner, drawn on top of the 3D view.
+             A dark see-through background keeps the white text readable over the stars. -->
+        <Border HorizontalAlignment="Left"
+                VerticalAlignment="Top"
+                Margin="10"
+                Padding="8,4"
+                Background="#B0202020"
+                CornerRadius="4">
+            <CheckBox x:Name="ProperNameFilterCheckBox"
+                      Content="Only show stars with a proper name"
+                      Foreground="White"
+                      IsChecked="False"
+                      Focusable="False"
+                      Checked="ProperNameFilterCheckBox_Changed"
+                      Unchecked="ProperNameFilterCheckBox_Changed" />
+        </Border>
     </Grid>
 </Window>
-    
