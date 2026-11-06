@@ -64,6 +64,7 @@ namespace StarChart3D
             }
 
             WriteCatalogueNameTest();
+            WriteSpectralColourTest();
         }
 
         /// <summary>
@@ -106,6 +107,31 @@ namespace StarChart3D
                 .GroupBy(s => CatalogueNames.GetDisplayName(s))
                 .Count(group => group.Count() > 1);
             Debug.WriteLine($"  Names used by more than one star: {duplicateNames}");
+        }
+
+        /// <summary>
+        /// Writes how many stars fall into each spectral class (and how many are unknown/grey)
+        /// to the Output window, plus the class of some known stars, so the colouring can be checked.
+        /// </summary>
+        private void WriteSpectralColourTest()
+        {
+            Debug.WriteLine("Spectral colour test:");
+            foreach (IGrouping<char?, Star> classGroup in starCollection.Stars
+                         .GroupBy(s => SpectralColours.GetSpectralClass(s.SpectralType))
+                         .OrderBy(g => "OBAFGKMLT".IndexOf(g.Key ?? '?')))
+            {
+                string className = classGroup.Key.HasValue ? classGroup.Key.Value.ToString() : "unknown (grey)";
+                Debug.WriteLine($"  {className}: {classGroup.Count()} stars");
+            }
+
+            foreach (int id in new[] { 0, 32263, 87665, 118441 })
+            {
+                Star? star = starCollection.Stars.FirstOrDefault(s => s.Id == id);
+                if (star != null)
+                {
+                    Debug.WriteLine($"  id {id} {CatalogueNames.GetDisplayName(star)}: spect '{star.SpectralType}' -> class {SpectralColours.GetSpectralClass(star.SpectralType)}");
+                }
+            }
         }
     }
 }

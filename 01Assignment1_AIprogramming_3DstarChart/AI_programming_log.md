@@ -403,3 +403,53 @@ me asking, but I kept it because it looks better.
 
 ### Commit
 Draw all 2000 stars as small white spheres in one mesh (StarRenderer)
+
+
+---
+## Entry 12 – 2026-11-06, 02:46 – feature2-visualising-star-chart
+### Prompt
+Context: Claude first checked my spect column and found messy values (D, d, sd, lowercase m/k/g,
+pec, S and 150 blanks), so I asked my domain expert (domain log Entry 2). I sent Claude the
+expert's full answer.
+
+### Response
+Claude checked the expert's rules against stars.csv: every star gets a class. It found that the
+expert's text and code disagree for white dwarfs (DC5 "white" in the text, F in the code, B by the
+expert's own formula 50400/n), so it used the formula with the temperature table for all white
+dwarfs. It chose grey for blank types instead of the ci/absmag fallback, so Star.cs and
+StarCollection.cs did not need changing (only 67 of the 150 blanks have ci).
+
+Code (see this commit):
+- new SpectralColours.cs: chart-style colours per class, grey for unknown, GetSpectralClass()
+  strips old prefixes (d, sd, esd, usd, c, g) with a regex, handles white dwarfs by temperature,
+  S → M, lowercase m/k/g → M/K/G
+- StarRenderer.cs: groups stars by colour, one mesh per colour, glowing material in that colour
+- MainWindow.xaml.cs: new WriteSpectralColourTest() writes the count per class to Output
+
+Result when I ran it:
+```
+Spectral colour test:
+  unknown (grey): 151 stars
+  B: 17 stars
+  A: 52 stars
+  F: 133 stars
+  G: 186 stars
+  K: 417 stars
+  M: 1044 stars
+  id 0 Sol: spect 'G2V' -> class G
+  id 32263 Sirius: spect 'A0m...' -> class A
+  id 87665 Barnard's Star: spect 'sdM4' -> class M
+  id 118441 Gl 244B: spect 'DA2' -> class B
+```
+
+### Critique
+The stars are now coloured and the counts add up to 2000. Most stars are red M dwarfs, which
+makes sense for the nearest stars. The AI caught that my domain expert was inconsistent about
+white dwarfs and fixed it by using one rule.
+
+The AI chose grey for unknown stars instead of the expert's ci fallback, to avoid changing
+Star.cs again. That is simpler but less accurate, so 151 stars have no real colour. Grouping by
+colour means 7 meshes instead of 1, which is still fast. I still cannot click on one star,
+because each colour is one big mesh.
+### Commit
+Colour stars by spectral class using domain expert rules (SpectralColours)

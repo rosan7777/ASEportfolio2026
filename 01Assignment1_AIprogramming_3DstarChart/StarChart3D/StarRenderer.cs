@@ -6,8 +6,9 @@ namespace StarChart3D
 {
     /// <summary>
     /// Draws the stars of a StarCollection into a HelixViewport3D.
-    /// Every star is a small sphere at its X, Y, Z position (in parsecs, Sun at 0,0,0).
-    /// All spheres are put into one mesh, so 2000 stars are drawn as a single 3D model.
+    /// Every star is a small sphere at its X, Y, Z position (in parsecs, Sun at 0,0,0),
+    /// coloured by its spectral class. Stars of the same colour share one mesh,
+    /// so 2000 stars are drawn as only a few 3D models.
     /// </summary>
     public class StarRenderer
     {
@@ -33,27 +34,39 @@ namespace StarChart3D
         }
 
         /// <summary>
-        /// Draws every star in the collection as a small white sphere.
+        /// Draws every star in the collection as a small sphere in its spectral class colour.
         /// Any stars drawn before are replaced.
         /// </summary>
         /// <param name="stars">The stars to draw.</param>
         public void Draw(StarCollection stars)
         {
-            MeshBuilder builder = new MeshBuilder(true, false);
+            Model3DGroup allStars = new Model3DGroup();
 
-            foreach (Star star in stars.Stars)
+            foreach (IGrouping<Color, Star> colourGroup in stars.Stars.GroupBy(SpectralColours.GetColour))
             {
-                builder.AddSphere(new Point3D(star.X, star.Y, star.Z),
-                                  StarRadius, SphereThetaDivisions, SpherePhiDivisions);
+                MeshBuilder builder = new MeshBuilder(true, false);
+                foreach (Star star in colourGroup)
+                {
+                    builder.AddSphere(new Point3D(star.X, star.Y, star.Z),
+                                      StarRadius, SphereThetaDivisions, SpherePhiDivisions);
+                }
+
+                allStars.Children.Add(new GeometryModel3D(builder.ToMesh(true), CreateGlowMaterial(colourGroup.Key)));
             }
 
-            // Stars give off their own light, so they are drawn with an emissive (glowing) material
-            // on top of a black diffuse one. This makes them look evenly bright from every side.
+            starsVisual.Content = allStars;
+        }
+
+        /// <summary>
+        /// Makes a glowing material in the given colour. Stars give off their own light, so an
+        /// emissive material is put on top of a black diffuse one, so they look evenly bright.
+        /// </summary>
+        private static Material CreateGlowMaterial(Color colour)
+        {
             MaterialGroup material = new MaterialGroup();
             material.Children.Add(new DiffuseMaterial(Brushes.Black));
-            material.Children.Add(new EmissiveMaterial(Brushes.White));
-
-            starsVisual.Content = new GeometryModel3D(builder.ToMesh(true), material);
+            material.Children.Add(new EmissiveMaterial(new SolidColorBrush(colour)));
+            return material;
         }
     }
 }
