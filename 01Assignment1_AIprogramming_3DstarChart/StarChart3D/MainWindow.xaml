@@ -8,11 +8,22 @@
         mc:Ignorable="d"
         Title="Star Chart 3D" Height="800" Width="1200">
     <Grid>
-        <!-- The 3D view of the star chart. Units are parsecs, with the Sun at (0,0,0). -->
+        <!-- The 3D view of the star chart. Units are parsecs, with the Sun at (0,0,0).
+             Mouse controls:
+               mouse wheel          = zoom towards the point under the mouse cursor
+               right mouse drag     = rotate
+               Shift + right drag   = pan (middle mouse drag also pans, which is Helix's default)
+             Inertia is off, so the view stops as soon as the mouse button is let go.
+             The camera's position is shown in the bottom-left corner. -->
         <h:HelixViewport3D x:Name="StarViewport"
                            Background="Black"
                            ShowCoordinateSystem="True"
-                           ShowViewCube="True">
+                           ShowViewCube="True"
+                           ZoomAroundMouseDownPoint="True"
+                           RotateGesture="RightClick"
+                           PanGesture="Shift+RightClick"
+                           IsInertiaEnabled="False"
+                           ShowCameraInfo="True">
 
             <!-- Camera 30 parsecs from the Sun, looking straight at it.
                  The furthest star in stars.csv is about 20.5 parsecs away, so all stars fit in view. -->

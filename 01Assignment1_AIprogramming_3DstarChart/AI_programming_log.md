@@ -550,3 +550,41 @@ it means you cannot use the keyboard to tick it, which is worse for accessibilit
 
 ### Commit
 Add switchable filter checkbox for stars with a proper name
+
+
+
+---
+## Entry 16 – 2026-11-06, 03:14 – feature2-visualising-star-chart
+### Prompt
+> Set up the mouse controls of the HelixViewport3D in MainWindow.xaml: the mouse wheel should zoom
+> towards where the mouse cursor points, right mouse drag should rotate, and middle mouse drag (or
+> Shift + right drag) should pan. Turn off inertia so the view stops when I let go. Show the
+> camera's position on screen so I can see the movement working. Explain which settings you used.
+> Don't change the C# files.
+
+### Response
+Claude added 5 HelixViewport3D settings in MainWindow.xaml (see this commit), with a comment
+listing the controls:
+- ZoomAroundMouseDownPoint="True" – zoom towards the point under the mouse
+- RotateGesture="RightClick" – right drag rotates
+- PanGesture="Shift+RightClick" – Shift + right drag pans
+- IsInertiaEnabled="False" – the view stops when the mouse is let go
+- ShowCameraInfo="True" – camera position and look direction shown bottom-left
+It did not set middle-drag panning because it said that is already Helix's default, but that
+this was from its knowledge and not tested. It said right-drag rotation already worked before.
+
+Result: the camera info moved from Position 0,0,30 to -2.229,-0.560,65.240 after zooming out
+and panning.
+
+### Critique
+It built first time, so the Helix property names were correct. The camera info box proves the
+mouse moves the camera: the position changed from 0,0,30 to about -2.2,-0.6,65.2 after I zoomed
+out and panned. [Zooming towards the cursor worked / did not work.] [Middle-drag panned / did
+not pan, so the AI's claim about the default was right / wrong.]
+
+The AI was honest that it had not tested the middle button. Right-drag already worked before, so
+that setting only makes it clear in the code. The camera info box is useful for testing but takes
+space on screen, so I may turn it off later.
+
+### Commit
+Set up mouse zoom, rotate and pan, turn off inertia, show camera info
