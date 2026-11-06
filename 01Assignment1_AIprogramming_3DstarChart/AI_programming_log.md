@@ -297,3 +297,41 @@ so it is based on the programming AI's word.
 
 ### Commit
 Fix duplicate names for binary stars by adding the component letter (61 Cyg A / B)
+
+
+
+---
+## Entry 9 – 2026-11-06, 01:48 – feature2-visualising-star-chart
+### Prompt
+Context: Feature 2 must be "3D Visualising the Star Chart". Claude compared WPF's built-in
+Viewport3D with the HelixToolkit library and recommended HelixToolkit (built-in mouse zoom, pan
+and rotate, ready-made spheres and 3D text). I checked the spec: it has no rule against libraries,
+and the module leader's example also uses HelixToolkit. I said:
+
+> lets start. As i dont have much time so lets start right now
+
+### Response
+Claude checked NuGet. HelixToolkit.Wpf 3.1.2 is newest but v3 is a big rewrite that Claude is
+less sure of, so it recommended v2: HelixToolkit.Wpf 2.27.3, installed with
+`dotnet add ... package HelixToolkit.Wpf --version 2.27.3`.
+
+The build succeeded but showed warning NU1701: the package "was restored using
+.NETFramework,Version=v4.6.1 ... v4.8.1 instead of the project target framework
+net10.0-windows7.0. This package may not be fully compatible with your project."
+
+Claude then found HelixToolkit.Core.Wpf 2.27.3: the same v2 library, built for .NET Core 3.1 and
+compatible with .NET 10. I removed HelixToolkit.Wpf and added HelixToolkit.Core.Wpf. The build
+then said "compatible with all the specified frameworks", 0 warnings, 0 errors.
+
+### Critique
+The AI's first package choice was wrong. HelixToolkit.Wpf only has .NET Framework versions, so
+on my .NET 10 project it gave warning NU1701. The build still succeeded, so I could have missed
+it, but it might have caused strange errors later. I did not ignore the warning. The AI found
+HelixToolkit.Core.Wpf, the same library built for modern .NET, and now there are 0 warnings.
+
+I chose version 2 instead of the newest version 3, because v3 is a big rewrite and the AI is
+less sure of its code, so it could make up code that does not exist. Version 2 is in maintenance
+mode, which is fine for this project.
+
+### Commit
+Add HelixToolkit.Core.Wpf 2.27.3 for 3D rendering
