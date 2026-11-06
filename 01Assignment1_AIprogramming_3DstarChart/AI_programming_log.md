@@ -292,8 +292,8 @@ star. I chose the simple fix. The downside is that 34 stars that did not have a 
 get a letter now, like 70 Oph A. That is still correct because it is part of a binary system.
 
 The new line that counts duplicate names makes the test stronger, because it checks all 2000
-stars and not just the 6 I picked. [If you did not ask the expert: I did not check the A/B
-naming with my astronomy expert, so it is based on the programming AI's word.]
+stars and not just the 6 I picked. I did not check the A/B naming with my astronomy expert,
+so it is based on the programming AI's word.
 
 ### Commit
 Fix duplicate names for binary stars by adding the component letter (61 Cyg A / B)
