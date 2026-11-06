@@ -367,3 +367,39 @@ need changing too, so a fixed number is a weak point.
 
 ### Commit
 Add black 3D HelixViewport3D with camera looking at the Sun
+
+
+
+
+---
+## Entry 11 – 2026-11-06, 02:15 – feature2-visualising-star-chart
+### Prompt
+> Create a new class StarRenderer in the StarChart3D namespace that draws every star in a
+> StarCollection into the HelixViewport3D as a small sphere at its X, Y, Z position (in parsecs).
+> Put all the spheres in one mesh so 2000 stars draw quickly. Make all stars white for now;
+> colours by spectral class are the next step. In MainWindow.xaml.cs, call StarRenderer after the
+> stars load. Don't change Star.cs, StarCollection.cs or CatalogueNames.cs.
+
+### Response
+Claude wrote StarRenderer.cs (see this commit): it adds one ModelVisual3D to the viewport, and
+Draw() uses HelixToolkit's MeshBuilder.AddSphere for every star (radius 0.1 parsecs, low detail)
+and ToMesh to make one mesh. It used a glowing (emissive) white material on top of black, which
+I did not ask for, so stars look evenly bright. In MainWindow.xaml.cs it added a starRenderer
+field, creates it after InitializeComponent, and calls Draw after the stars load. It also fixed
+the indentation in my test method. It said MeshBuilder, AddSphere and ToMesh exist in v2 but
+the build is the real test.
+
+Result: 2000 white dots in a ball shape around the Sun, which I can rotate.
+
+### Critique
+It works: I can see all the stars as white dots, and they make a ball shape because I chose the
+2000 nearest stars. The drawing code is in its own class, StarRenderer, not in MainWindow, which
+is better design. The Helix names the AI used were real, because the build had no errors.
+
+One mesh is fast, but it means all stars are one object, so I cannot click or colour one star
+on its own. For colours I will need one mesh per colour. The Sun looks the same as every other
+star, so it is hard to see where the centre is. The AI also added the glowing material without
+me asking, but I kept it because it looks better.
+
+### Commit
+Draw all 2000 stars as small white spheres in one mesh (StarRenderer)
