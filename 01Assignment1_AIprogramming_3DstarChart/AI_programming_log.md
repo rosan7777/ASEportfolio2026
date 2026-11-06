@@ -453,3 +453,38 @@ colour means 7 meshes instead of 1, which is still fast. I still cannot click on
 because each colour is one big mesh.
 ### Commit
 Colour stars by spectral class using domain expert rules (SpectralColours)
+
+
+
+
+---
+## Entry 13 – 2026-11-06, 03:00 – feature2-visualising-star-chart
+### Prompt
+> Add star name labels to the 3D view. Every star should show its display name from
+> CatalogueNames, as small text just next to its sphere, that always faces the camera. Draw all
+> the labels as one group so 2000 labels stay fast. Put this in StarRenderer, not MainWindow.
+> Don't change the colours or the other classes.
+
+### Response
+Claude updated StarRenderer.cs (see this commit):
+- the old sphere code moved unchanged into DrawSpheres(); new DrawLabels() makes one
+  BillboardTextItem per star with its CatalogueNames display name, 0.15 parsecs above the star
+- all labels go into one HelixToolkit BillboardTextGroupVisual3D (light grey, transparent
+  background, font size 10), added to the viewport once
+- no other class was changed
+It warned that it was not 100% sure of every Helix property name (HorizontalAlignment,
+VerticalAlignment, Items), that a transparent background in WPF 3D can show as black boxes,
+and that 2000 labels would be crowded until the filter is added.
+
+### Critique
+
+ It built without errors and the star names show next to the stars and keep facing the
+camera when I rotate, so the Helix names the AI used were real this time.
+
+With all 2000 names on screen it is very crowded and hard to read, especially in the
+middle where the stars are close together. That is why the next step is the filter for
+stars without a proper name. Putting all labels in one group keeps it fast, but it also
+means I cannot hide or change one label on its own.
+
+### Commit
+Add star name labels with one BillboardTextGroupVisual3D (StarRenderer)

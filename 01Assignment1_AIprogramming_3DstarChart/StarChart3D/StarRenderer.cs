@@ -1,4 +1,5 @@
-﻿using System.Windows.Media;
+﻿using System.Windows;
+using System.Windows.Media;
 using System.Windows.Media.Media3D;
 using HelixToolkit.Wpf;
 
@@ -7,8 +8,8 @@ namespace StarChart3D
     /// <summary>
     /// Draws the stars of a StarCollection into a HelixViewport3D.
     /// Every star is a small sphere at its X, Y, Z position (in parsecs, Sun at 0,0,0),
-    /// coloured by its spectral class. Stars of the same colour share one mesh,
-    /// so 2000 stars are drawn as only a few 3D models.
+    /// coloured by its spectral class, with its name next to it. Stars of the same colour share
+    /// one mesh, and all names are drawn as one group, so 2000 stars stay fast.
     /// </summary>
     public class StarRenderer
     {
@@ -21,24 +22,50 @@ namespace StarChart3D
         /// <summary>How many slices from top to bottom of each sphere.</summary>
         private const int SpherePhiDivisions = 4;
 
+        /// <summary>How far above the centre of a star its name is placed, in parsecs.</summary>
+        private const double LabelOffset = 0.15;
+
+        /// <summary>The font size of the star names.</summary>
+        private const double LabelFontSize = 10;
+
         /// <summary>The 3D object that holds all the star spheres. It is added to the viewport once.</summary>
         private readonly ModelVisual3D starsVisual = new ModelVisual3D();
 
         /// <summary>
-        /// Creates the renderer and adds its (still empty) star model to the viewport.
+        /// The 3D object that holds all the star names. A billboard text always faces the camera.
+        /// </summary>
+        private readonly BillboardTextGroupVisual3D labelsVisual = new BillboardTextGroupVisual3D
+        {
+            Foreground = Brushes.LightGray,
+            Background = Brushes.Transparent,
+            FontSize = LabelFontSize
+        };
+
+        /// <summary>
+        /// Creates the renderer and adds its (still empty) star model and labels to the viewport.
         /// </summary>
         /// <param name="viewport">The 3D view to draw the stars in.</param>
         public StarRenderer(HelixViewport3D viewport)
         {
             viewport.Children.Add(starsVisual);
+            viewport.Children.Add(labelsVisual);
         }
 
         /// <summary>
-        /// Draws every star in the collection as a small sphere in its spectral class colour.
-        /// Any stars drawn before are replaced.
+        /// Draws every star in the collection as a small sphere in its spectral class colour,
+        /// with its display name next to it. Any stars drawn before are replaced.
         /// </summary>
         /// <param name="stars">The stars to draw.</param>
         public void Draw(StarCollection stars)
+        {
+            DrawSpheres(stars);
+            DrawLabels(stars);
+        }
+
+        /// <summary>
+        /// Draws the star spheres, one mesh per spectral class colour.
+        /// </summary>
+        private void DrawSpheres(StarCollection stars)
         {
             Model3DGroup allStars = new Model3DGroup();
 
@@ -55,6 +82,28 @@ namespace StarChart3D
             }
 
             starsVisual.Content = allStars;
+        }
+
+        /// <summary>
+        /// Puts each star's display name (from CatalogueNames) just above its sphere.
+        /// All labels are given to one BillboardTextGroupVisual3D so they are drawn together.
+        /// </summary>
+        private void DrawLabels(StarCollection stars)
+        {
+            List<BillboardTextItem> labels = new List<BillboardTextItem>();
+
+            foreach (Star star in stars.Stars)
+            {
+                labels.Add(new BillboardTextItem
+                {
+                    Text = CatalogueNames.GetDisplayName(star),
+                    Position = new Point3D(star.X, star.Y + LabelOffset, star.Z),
+                    HorizontalAlignment = HorizontalAlignment.Left,
+                    VerticalAlignment = VerticalAlignment.Bottom
+                });
+            }
+
+            labelsVisual.Items = labels;
         }
 
         /// <summary>
