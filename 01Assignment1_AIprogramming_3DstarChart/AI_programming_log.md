@@ -259,3 +259,41 @@ makes this a real test. But the test also shows a problem: two different stars a
 This test is only in the Output window, not a proper unit test.
 ### Commit
 Add catalogue name test output for known stars
+
+---
+## Entry 8 – 2026-11-06, 00:50 – feature1-create-star-chart
+### Prompt
+Context: my test in Entry 7 showed two different stars both named "61 Cyg". Claude tested two
+fixes on my data. Fix 1: always add the A/B/C letter from the Gliese name to Bayer and Flamsteed
+names (44 names change, all duplicates removed). Fix 2: add the letter only when two stars share a
+name (only 10 change, but CatalogueNames would need the whole collection). I replied:
+
+> do whichever is simple
+
+### Response
+Claude used Fix 1 (see this commit):
+- CatalogueNames.cs: new method GetComponentLetter() takes the last letter of the Gliese name if
+  it comes straight after a digit ("Gl 820B" gives " B", "Gl 71" gives nothing). It is added to
+  Bayer and Flamsteed names.
+- MainWindow.xaml.cs: test expected values changed to "p Eri A", "61 Cyg A", "61 Cyg B", and a
+  new line counts names used by more than one star.
+
+Result when I ran it:
+```
+  id 7736: p Eri A (expected p Eri A) OK
+  id 103879: 61 Cyg A (expected 61 Cyg A) OK
+  id 103883: 61 Cyg B (expected 61 Cyg B) OK
+  Names used by more than one star: 0
+```
+
+### Critique
+The fix works: my test now shows 61 Cyg A and 61 Cyg B, and no name is used by more than one
+star. I chose the simple fix. The downside is that 34 stars that did not have a duplicate also
+get a letter now, like 70 Oph A. That is still correct because it is part of a binary system.
+
+The new line that counts duplicate names makes the test stronger, because it checks all 2000
+stars and not just the 6 I picked. [If you did not ask the expert: I did not check the A/B
+naming with my astronomy expert, so it is based on the programming AI's word.]
+
+### Commit
+Fix duplicate names for binary stars by adding the component letter (61 Cyg A / B)

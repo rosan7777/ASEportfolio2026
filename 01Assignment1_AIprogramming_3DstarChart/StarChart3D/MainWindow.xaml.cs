@@ -73,9 +73,9 @@ namespace StarChart3D
                 (0, "Sol"),
                 (8087, "τ Cet"),
                 (15419, "κ¹ Cet"),
-                (7736, "p Eri"),
-                (103879, "61 Cyg"),
-                (103883, "61 Cyg")
+                                (7736, "p Eri A"),
+                (103879, "61 Cyg A"),
+                (103883, "61 Cyg B")
             };
 
             Debug.WriteLine("Catalogue name test:");
@@ -95,7 +95,11 @@ namespace StarChart3D
 
             int properCount = starCollection.Stars.Count(s => !string.IsNullOrWhiteSpace(s.ProperName));
             int generatedCount = starCollection.Count - properCount;
-            Debug.WriteLine($"  {properCount} stars have a proper name, {generatedCount} got a generated name");
+         Debug.WriteLine($"  {properCount} stars have a proper name, {generatedCount} got a generated name");            
+            int duplicateNames = starCollection.Stars
+        .GroupBy(s => CatalogueNames.GetDisplayName(s))
+        .Count(group => group.Count() > 1);
+            Debug.WriteLine($"  Names used by more than one star: {duplicateNames}");
         }
     }
 }

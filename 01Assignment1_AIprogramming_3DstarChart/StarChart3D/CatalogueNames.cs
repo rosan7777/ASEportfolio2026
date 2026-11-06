@@ -6,6 +6,8 @@ namespace StarChart3D
     /// Works out the name to show for a star. Stars with a proper name keep it; other stars get a
     /// catalogue name, using the order of preference from my domain expert (see AI_domainExpert_log.md):
     /// proper name, Bayer, Flamsteed, Gliese, HD, HIP, then the HYG id.
+    /// Bayer and Flamsteed names get the component letter (A, B, C) from the Gliese name, so the
+    /// stars of a binary system have different names, for example "61 Cyg A" and "61 Cyg B".
     /// </summary>
     public static class CatalogueNames
     {
@@ -48,7 +50,7 @@ namespace StarChart3D
         /// otherwise the best catalogue name available.
         /// </summary>
         /// <param name="star">The star to name.</param>
-        /// <returns>For example "Sirius", "τ Cet", "κ¹ Cet", "52 Cet", "Gl 71", "HD 48915", "HIP 32349" or "HYG 5".</returns>
+        /// <returns>For example "Sirius", "τ Cet", "61 Cyg A", "Gl 71", "HD 48915", "HIP 32349" or "HYG 5".</returns>
         public static string GetDisplayName(Star star)
         {
             if (HasValue(star.ProperName))
@@ -58,12 +60,12 @@ namespace StarChart3D
 
             if (HasValue(star.Bayer))
             {
-                return $"{FormatBayer(star.Bayer)} {star.Constellation}".Trim();
+                return $"{FormatBayer(star.Bayer)} {star.Constellation}".Trim() + GetComponentLetter(star);
             }
 
             if (HasValue(star.Flamsteed))
             {
-                return $"{star.Flamsteed} {star.Constellation}".Trim();
+                return $"{star.Flamsteed} {star.Constellation}".Trim() + GetComponentLetter(star);
             }
 
             if (HasValue(star.Gliese))
@@ -82,6 +84,24 @@ namespace StarChart3D
             }
 
             return $"HYG {star.Id}";
+        }
+
+        /// <summary>
+        /// Returns the component letter of a star in a multiple system, taken from the end of its
+        /// Gliese name, with a space in front: "Gl 820B" gives " B". Returns an empty string if
+        /// the Gliese name has no letter after its number (for example "Gl 71").
+        /// </summary>
+        private static string GetComponentLetter(Star star)
+        {
+            string gliese = star.Gliese.Trim();
+            if (gliese.Length >= 2
+                && char.IsAsciiLetterUpper(gliese[^1])
+                && char.IsAsciiDigit(gliese[^2]))
+            {
+                return " " + gliese[^1];
+            }
+
+            return string.Empty;
         }
 
         /// <summary>
