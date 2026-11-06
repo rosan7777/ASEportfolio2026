@@ -57,6 +57,45 @@ namespace StarChart3D
                 string name = star.ProperName.Length > 0 ? star.ProperName : "(no proper name)";
                 Debug.WriteLine($"  Star {i + 1}: id {star.Id}, {name}, {star.Distance} parsecs");
             }
+
+            WriteCatalogueNameTest();
+        }
+
+        /// <summary>
+        /// Writes the display names of some known test stars to the Output window, next to the
+        /// name each one should have, and counts how many stars have a proper or generated name.
+        /// This is a test so the naming can be shown in the demo.
+        /// </summary>
+        private void WriteCatalogueNameTest()
+        {
+            (int Id, string Expected)[] testStars =
+            {
+                (0, "Sol"),
+                (8087, "τ Cet"),
+                (15419, "κ¹ Cet"),
+                (7736, "p Eri"),
+                (103879, "61 Cyg"),
+                (103883, "61 Cyg")
+            };
+
+            Debug.WriteLine("Catalogue name test:");
+            foreach ((int id, string expected) in testStars)
+            {
+                Star? star = starCollection.Stars.FirstOrDefault(s => s.Id == id);
+                if (star == null)
+                {
+                    Debug.WriteLine($"  id {id}: NOT FOUND");
+                    continue;
+                }
+
+                string actual = CatalogueNames.GetDisplayName(star);
+                string result = actual == expected ? "OK" : "WRONG";
+                Debug.WriteLine($"  id {id}: {actual} (expected {expected}) {result}");
+            }
+
+            int properCount = starCollection.Stars.Count(s => !string.IsNullOrWhiteSpace(s.ProperName));
+            int generatedCount = starCollection.Count - properCount;
+            Debug.WriteLine($"  {properCount} stars have a proper name, {generatedCount} got a generated name");
         }
     }
 }

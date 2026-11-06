@@ -219,3 +219,43 @@ will do that next.
 
 ### Commit
 Add CatalogueNames: generate catalogue names for stars without proper names
+
+
+---
+## Entry 7 – 2026-11-05, 23:56 – feature1-create-star-chart
+### Prompt
+> In MainWindow.xaml.cs, after the stars load, use CatalogueNames to write the display names of
+> these test stars to the Output window, looked up by id: 0 (Sol), 8087 (Tau Ceti, should be
+> "τ Cet"), 15419 (should be "κ¹ Cet"), 7736 (should be "p Eri"), 103879 and 103883 (both
+> "61 Cyg"). Also write how many stars have a proper name and how many got a generated name.
+> Don't change any other class.
+
+### Response
+Claude added one line to MainWindow_Loaded and a new method WriteCatalogueNameTest() (see this
+commit). It looks each test star up by id, writes its generated name next to the expected name
+with OK or WRONG, and counts proper vs generated names. It said it added the expected/OK/WRONG
+part itself, which I did not ask for, and that the two "61 Cyg" lines passing actually proves
+the duplicate-name bug.
+
+Result when I ran it:
+```
+Catalogue name test:
+  id 0: Sol (expected Sol) OK
+  id 8087: τ Cet (expected τ Cet) OK
+  id 15419: κ¹ Cet (expected κ¹ Cet) OK
+  id 7736: p Eri (expected p Eri) OK
+  id 103879: 61 Cyg (expected 61 Cyg) OK
+  id 103883: 61 Cyg (expected 61 Cyg) OK
+  89 stars have a proper name, 1911 got a generated name
+```
+
+### Critique
+I ran the app and every test line says OK, and the counts (89 proper, 1911 generated) add up
+to 2000. So the naming works, including Tau Ceti, the superscript and the Latin "p".
+
+The AI added the expected value and OK/WRONG even though I did not ask. I kept it because it
+makes this a real test. But the test also shows a problem: two different stars are both called
+"61 Cyg". The code is doing what my rules say, so the rules need fixing, which is my next commit.
+This test is only in the Output window, not a proper unit test.
+### Commit
+Add catalogue name test output for known stars
