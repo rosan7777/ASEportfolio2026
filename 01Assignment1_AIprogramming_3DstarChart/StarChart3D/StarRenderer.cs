@@ -10,6 +10,7 @@ namespace StarChart3D
     /// Every star is a small sphere at its X, Y, Z position (in parsecs, Sun at 0,0,0),
     /// coloured by its spectral class, with its name next to it. Stars of the same colour share
     /// one mesh, and all names are drawn as one group, so 2000 stars stay fast.
+    /// It can be told to draw only the stars that have a proper name.
     /// </summary>
     public class StarRenderer
     {
@@ -52,24 +53,41 @@ namespace StarChart3D
         }
 
         /// <summary>
-        /// Draws every star in the collection as a small sphere in its spectral class colour,
-        /// with its display name next to it. Any stars drawn before are replaced.
+        /// Draws the stars as small spheres in their spectral class colour, each with its display
+        /// name next to it. Any stars drawn before are replaced.
         /// </summary>
         /// <param name="stars">The stars to draw.</param>
-        public void Draw(StarCollection stars)
+        /// <param name="onlyProperNames">
+        /// If true, only stars with a proper name (such as "Sirius") are drawn; stars that only
+        /// have a generated catalogue name are hidden, both sphere and label.
+        /// </param>
+        /// <returns>How many stars were drawn.</returns>
+        public int Draw(StarCollection stars, bool onlyProperNames)
         {
-            DrawSpheres(stars);
-            DrawLabels(stars);
+            List<Star> starsToDraw = stars.Stars
+                .Where(star => !onlyProperNames || HasProperName(star))
+                .ToList();
+
+            DrawSpheres(starsToDraw);
+            DrawLabels(starsToDraw);
+
+            return starsToDraw.Count;
+        }
+
+        /// <summary>Returns true if the star has a proper name in the data.</summary>
+        private static bool HasProperName(Star star)
+        {
+            return !string.IsNullOrWhiteSpace(star.ProperName);
         }
 
         /// <summary>
         /// Draws the star spheres, one mesh per spectral class colour.
         /// </summary>
-        private void DrawSpheres(StarCollection stars)
+        private void DrawSpheres(IEnumerable<Star> stars)
         {
             Model3DGroup allStars = new Model3DGroup();
 
-            foreach (IGrouping<Color, Star> colourGroup in stars.Stars.GroupBy(SpectralColours.GetColour))
+            foreach (IGrouping<Color, Star> colourGroup in stars.GroupBy(SpectralColours.GetColour))
             {
                 MeshBuilder builder = new MeshBuilder(true, false);
                 foreach (Star star in colourGroup)
@@ -88,11 +106,11 @@ namespace StarChart3D
         /// Puts each star's display name (from CatalogueNames) just above its sphere.
         /// All labels are given to one BillboardTextGroupVisual3D so they are drawn together.
         /// </summary>
-        private void DrawLabels(StarCollection stars)
+        private void DrawLabels(IEnumerable<Star> stars)
         {
             List<BillboardTextItem> labels = new List<BillboardTextItem>();
 
-            foreach (Star star in stars.Stars)
+            foreach (Star star in stars)
             {
                 labels.Add(new BillboardTextItem
                 {

@@ -488,3 +488,31 @@ means I cannot hide or change one label on its own.
 
 ### Commit
 Add star name labels with one BillboardTextGroupVisual3D (StarRenderer)
+
+
+---
+## Entry 14 – 2026-11-06, 03:05 – feature2-visualising-star-chart
+### Prompt
+> Add a filter to StarRenderer so Draw can show only the stars that have a proper name (not a
+> generated catalogue name). Add a parameter to Draw for this. When the filter is on, hide both
+> the sphere and the label of stars without a proper name. Draw should return how many stars it
+> drew. In MainWindow, turn the filter on for now so I can test it; the on/off switch is the next
+> step. Don't change the other classes.
+
+### Response
+Claude changed StarRenderer.cs (see this commit): Draw(stars, onlyProperNames) now filters the
+stars with a new HasProperName() helper, passes the same filtered list to DrawSpheres and
+DrawLabels, and returns how many stars were drawn. In MainWindow.xaml.cs, Draw is called with
+onlyProperNames: true and the title shows "N stars loaded, M shown".
+
+### Critique
+It works: only the named stars show now, like Sirius, Procyon, Vega and Altair, and the names
+are readable, with Sol in the middle.
+
+The middle is still crowded, because the nearest stars are close to the Sun, so names like Sol,
+Proxima Centauri and Wolf 359 overlap. Some labels have a small bar at the start or look cut
+off at the end, which I will try to fix later. I also found that some "proper names" in HYG are
+really old Gould numbers like "268 G. Cet", so the filter counts them as named stars.
+
+### Commit
+Add filter to draw only stars with a proper name (StarRenderer.Draw)

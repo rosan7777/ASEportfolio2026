@@ -52,8 +52,9 @@ namespace StarChart3D
                 return;
             }
 
-            Title = $"Star Chart 3D - {starCollection.Count} stars loaded";
-            starRenderer.Draw(starCollection);
+            // Filter turned on for testing; an on/off switch comes in the next commit.
+            int starsDrawn = starRenderer.Draw(starCollection, onlyProperNames: true);
+            Title = $"Star Chart 3D - {starCollection.Count} stars loaded, {starsDrawn} shown";
 
             Debug.WriteLine($"Loaded {starCollection.Count} stars from {filePath}");
             for (int i = 0; i < 3 && i < starCollection.Count; i++)
