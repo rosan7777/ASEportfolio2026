@@ -1,11 +1,12 @@
 ﻿using System.Diagnostics;
 using System.IO;
 using System.Windows;
+using System.Windows.Input;
 
 namespace StarChart3D
 {
     /// <summary>
-    /// The main window. Loads the star data when it opens.
+    /// The main window. Loads the star data when it opens and draws it in 3D.
     /// </summary>
     public partial class MainWindow : Window
     {
@@ -15,18 +16,27 @@ namespace StarChart3D
         /// <summary>All the stars loaded from the data file.</summary>
         private readonly StarCollection starCollection = new StarCollection();
 
+        /// <summary>Draws the stars into the 3D view.</summary>
+        private readonly StarRenderer starRenderer;
+
+        /// <summary>Moves the 3D camera with the keyboard.</summary>
+        private readonly KeyboardCameraController keyboardCameraController;
+
         /// <summary>
         /// Creates the window and asks for the stars to be loaded once it has opened.
         /// </summary>
         public MainWindow()
         {
             InitializeComponent();
+            starRenderer = new StarRenderer(StarViewport);
+            keyboardCameraController = new KeyboardCameraController(StarViewport);
             Loaded += MainWindow_Loaded;
+            PreviewKeyDown += MainWindow_PreviewKeyDown;
         }
 
         /// <summary>
-        /// Runs when the window has opened: loads the stars, shows the count in the title,
-        /// and writes the count and the first 3 stars to the Output window.
+        /// Runs when the window has opened: loads the stars, draws them, and writes the count,
+        /// the first 3 stars and the tests to the Output window.
         /// If loading fails, an error message is shown instead of crashing.
         /// </summary>
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
@@ -48,7 +58,7 @@ namespace StarChart3D
                 return;
             }
 
-            Title = $"Star Chart 3D - {starCollection.Count} stars loaded";
+            RedrawStars();
 
             Debug.WriteLine($"Loaded {starCollection.Count} stars from {filePath}");
             for (int i = 0; i < 3 && i < starCollection.Count; i++)
@@ -59,6 +69,38 @@ namespace StarChart3D
             }
 
             WriteCatalogueNameTest();
+            WriteSpectralColourTest();
+        }
+
+        /// <summary>
+        /// Draws the stars again, using the filter checkbox to decide whether only stars with a
+        /// proper name are shown, and shows how many stars are drawn in the title.
+        /// </summary>
+        private void RedrawStars()
+        {
+            bool onlyProperNames = ProperNameFilterCheckBox.IsChecked == true;
+            int starsDrawn = starRenderer.Draw(starCollection, onlyProperNames);
+            Title = $"Star Chart 3D - {starCollection.Count} stars loaded, {starsDrawn} shown";
+        }
+
+        /// <summary>
+        /// Runs when a key is pressed anywhere in the window. Camera keys are passed to the
+        /// keyboard controller; if it uses the key, the key is marked as handled.
+        /// </summary>
+        private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            if (keyboardCameraController.HandleKey(e.Key))
+            {
+                e.Handled = true;
+            }
+        }
+
+        /// <summary>
+        /// Runs when the "Only show stars with a proper name" checkbox is ticked or unticked.
+        /// </summary>
+        private void ProperNameFilterCheckBox_Changed(object sender, RoutedEventArgs e)
+        {
+            RedrawStars();
         }
 
         /// <summary>
@@ -73,7 +115,7 @@ namespace StarChart3D
                 (0, "Sol"),
                 (8087, "τ Cet"),
                 (15419, "κ¹ Cet"),
-                                (7736, "p Eri A"),
+                (7736, "p Eri A"),
                 (103879, "61 Cyg A"),
                 (103883, "61 Cyg B")
             };
@@ -95,11 +137,37 @@ namespace StarChart3D
 
             int properCount = starCollection.Stars.Count(s => !string.IsNullOrWhiteSpace(s.ProperName));
             int generatedCount = starCollection.Count - properCount;
-         Debug.WriteLine($"  {properCount} stars have a proper name, {generatedCount} got a generated name");            
+            Debug.WriteLine($"  {properCount} stars have a proper name, {generatedCount} got a generated name");
+
             int duplicateNames = starCollection.Stars
-        .GroupBy(s => CatalogueNames.GetDisplayName(s))
-        .Count(group => group.Count() > 1);
+                .GroupBy(s => CatalogueNames.GetDisplayName(s))
+                .Count(group => group.Count() > 1);
             Debug.WriteLine($"  Names used by more than one star: {duplicateNames}");
+        }
+
+        /// <summary>
+        /// Writes how many stars fall into each spectral class (and how many are unknown/grey)
+        /// to the Output window, plus the class of some known stars, so the colouring can be checked.
+        /// </summary>
+        private void WriteSpectralColourTest()
+        {
+            Debug.WriteLine("Spectral colour test:");
+            foreach (IGrouping<char?, Star> classGroup in starCollection.Stars
+                         .GroupBy(s => SpectralColours.GetSpectralClass(s.SpectralType))
+                         .OrderBy(g => "OBAFGKMLT".IndexOf(g.Key ?? '?')))
+            {
+                string className = classGroup.Key.HasValue ? classGroup.Key.Value.ToString() : "unknown (grey)";
+                Debug.WriteLine($"  {className}: {classGroup.Count()} stars");
+            }
+
+            foreach (int id in new[] { 0, 32263, 87665, 118441 })
+            {
+                Star? star = starCollection.Stars.FirstOrDefault(s => s.Id == id);
+                if (star != null)
+                {
+                    Debug.WriteLine($"  id {id} {CatalogueNames.GetDisplayName(star)}: spect '{star.SpectralType}' -> class {SpectralColours.GetSpectralClass(star.SpectralType)}");
+                }
+            }
         }
     }
 }

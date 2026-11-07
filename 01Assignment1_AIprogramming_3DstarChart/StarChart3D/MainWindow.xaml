@@ -4,9 +4,57 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:StarChart3D"
+        xmlns:h="http://helix-toolkit.org/wpf"
         mc:Ignorable="d"
-        Title="MainWindow" Height="450" Width="800">
+        Title="Star Chart 3D" Height="800" Width="1200">
     <Grid>
+        <!-- The 3D view of the star chart. Units are parsecs, with the Sun at (0,0,0).
+             Mouse controls:
+               mouse wheel          = zoom towards the point under the mouse cursor
+               right mouse drag     = rotate
+               Shift + right drag   = pan (middle mouse drag also pans, which is Helix's default)
+             Inertia is off, so the view stops as soon as the mouse button is let go.
+             The camera's position is shown in the bottom-left corner. -->
+        <h:HelixViewport3D x:Name="StarViewport"
+                           Background="Black"
+                           ShowCoordinateSystem="True"
+                           ShowViewCube="True"
+                           ZoomAroundMouseDownPoint="True"
+                           RotateGesture="RightClick"
+                           PanGesture="Shift+RightClick"
+                           IsInertiaEnabled="False"
+                           ShowCameraInfo="True">
 
+            <!-- Camera 30 parsecs from the Sun, looking straight at it.
+                 The furthest star in stars.csv is about 20.5 parsecs away, so all stars fit in view. -->
+            <h:HelixViewport3D.Camera>
+                <PerspectiveCamera Position="0,0,30"
+                                   LookDirection="0,0,-30"
+                                   UpDirection="0,1,0"
+                                   FieldOfView="60"
+                                   NearPlaneDistance="0.01"
+                                   FarPlaneDistance="1000" />
+            </h:HelixViewport3D.Camera>
+
+            <!-- Standard lighting so 3D shapes are visible. -->
+            <h:DefaultLights />
+        </h:HelixViewport3D>
+
+        <!-- Controls panel in the top-left corner, drawn on top of the 3D view.
+             A dark see-through background keeps the white text readable over the stars. -->
+        <Border HorizontalAlignment="Left"
+                VerticalAlignment="Top"
+                Margin="10"
+                Padding="8,4"
+                Background="#B0202020"
+                CornerRadius="4">
+            <CheckBox x:Name="ProperNameFilterCheckBox"
+                      Content="Only show stars with a proper name"
+                      Foreground="White"
+                      IsChecked="False"
+                      Focusable="False"
+                      Checked="ProperNameFilterCheckBox_Changed"
+                      Unchecked="ProperNameFilterCheckBox_Changed" />
+        </Border>
     </Grid>
 </Window>

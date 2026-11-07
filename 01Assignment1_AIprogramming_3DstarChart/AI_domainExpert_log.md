@@ -137,3 +137,79 @@ I found some problems with the answer:
 
 I will use its order of preference (proper, Bayer, Flamsteed, Gliese, HD, HIP, HYG id) to make
 names for stars without a proper name, and 3.26156 to turn parsecs into light years in Feature 3.
+
+
+
+---
+## Entry 2 – 2026-11-06, 02:45 – spectral class colours
+### Question
+I'm colouring stars by spectral class in my star chart (HYG v4.4, the 2000 stars nearest the
+Sun). What colour should each main class O, B, A, F, G, K, M be? My spect column also has values
+that don't start with those letters: "DA2", "DC5", "DA" (114 stars start with D), "dM5.5e"
+(79 start with lowercase d), "sdM4", lowercase "m", "k" and "g" on their own, "p", "S", and 150
+stars with a blank spectral type. What do these mean, which class should each be treated as for
+colouring, and what colour should I use for a blank one?
+
+### Response
+**Colours for O–M** (two sets, depending on the look you want)
+
+| Class | Temperature | Realistic | Chart-style (more saturated) |
+|---|---|---|---|
+| O | > 30,000 K | #9BB0FF | #6B8CFF blue |
+| B | 10,000–30,000 K | #AABFFF | #9DB4FF blue-white |
+| A | 7,500–10,000 K | #CAD7FF | #E0E8FF white |
+| F | 6,000–7,500 K | #F8F7FF | #FFF8E7 yellow-white |
+| G | 5,200–6,000 K | #FFF4EA | #FFE86B yellow |
+| K | 3,700–5,200 K | #FFD2A1 | #FFAA55 orange |
+| M | 2,400–3,700 K | #FFCC6F | #FF6A4D red |
+
+The realistic values come from Mitchell Charity's "What colour are the stars?" table. Real stars
+look much paler than textbooks suggest, so on a dark background most chart makers use the
+saturated set. Only the letter matters for colour. Ignore the subclass number (the 2 in G2) and
+the luminosity class (V, III).
+
+**What the odd values mean**
+
+| Value | Meaning | Treat as |
+|---|---|---|
+| D… (DA2, DC5, DA) | White dwarf. The second letter is the spectrum type: A = hydrogen lines, B = helium, C = no lines, Q = carbon, Z = metals. The number is a temperature index, Teff ≈ 50,400 / n K. | By the number: under 2 → B, 2–5 → A (DA2 ≈ 25,000 K, blue-white; DC5 ≈ 10,000 K, white), 5–8 → F, over 8 → G. No number (DA) → A, white. |
+| d… (dM5.5e) | Old Mount Wilson prefix meaning dwarf, i.e. an ordinary main-sequence star. The trailing e means emission lines, usually a flare star. | Strip the d: dM5.5e → M |
+| sd… (sdM4) | Subdwarf: an old, metal-poor star slightly below the main sequence. esd and usd are extreme and ultra subdwarfs. | Strip the prefix: sdM4 → M |
+| lone m, k, g | In the Gliese nearby-star data these are rough types estimated from photometric colour rather than measured from a spectrum. I believe that's the convention, but I haven't verified it against the Gliese documentation. | Uppercase them: M, K, G |
+| p | "Peculiar" spectrum with no class given | Unknown, same as blank |
+| S | S-type star: a cool giant with zirconium-oxide bands, about as hot as an M star | M (red) |
+
+You may also find L and T (brown dwarfs, cooler than M). Give them a dark red such as #B03020 and
+a dim magenta-brown such as #8A3A6A, or treat them as M.
+
+**Blank spectral types.** Don't paint them a default class colour. Use this fallback chain:
+1. Use ci, the B–V colour index, if it's present. Convert it to temperature with Ballesteros'
+   formula: T = 4600 × (1/(0.92·ci + 1.7) + 1/(0.92·ci + 0.62)), then pick the class from the
+   temperature ranges in the first table.
+2. If ci is blank too, use absmag as a hint. Among the 2,000 nearest stars, unclassified stars are
+   mostly faint red dwarfs, so absmag > 9 → M is a reasonable guess.
+3. Otherwise use a neutral grey, such as #B0B0B0, so they read as "unknown" rather than as a real
+   class. Show "Unknown" in the info panel.
+
+I couldn't open your file this time because your computer isn't reachable right now, so I haven't
+checked how many of the 150 blank stars have ci values.
+
+**C# sketch** (it also gave a C# sketch with a Dictionary<char, Color> of the chart-style colours,
+a SpectralClass(spect, ci, absmag) method using two regular expressions, and a StarColour(Star)
+method. It said: "The prefix strip only fires when an uppercase class letter follows. That means a
+lone g isn't stripped away and still becomes G, while sdM4 and dM5.5e lose their prefixes correctly.")
+
+### How I used it
+I used the chart-style colours, because the expert said they look better on a black background.
+The programming AI checked the rules against my stars.csv and they give every star a class:
+B 17, A 52, F 133, G 186, K 417, M 1044 and 151 unknown. Sirius comes out A, the Sun G and
+Barnard's Star M, which is right.
+
+I found a problem in the answer: for white dwarfs the text says DC5 is about 10,000 K and white,
+but its own number ranges make DC5 F (yellow-white), and by its own formula 50400 / 5 = 10080 K,
+which is class B. So I used the formula with the temperature table for all white dwarfs, so it is
+consistent. The expert also said it was not sure about the lone m, k, g meaning.
+
+I did not use the ci and absmag fallback for blank stars, because my Star class does not store
+those columns and only 67 of the 150 blanks have ci. I show them grey as "unknown" instead. The
+expert's C# code also used names like st.Spect and st.Ci that are not in my Star class.

@@ -297,3 +297,332 @@ so it is based on the programming AI's word.
 
 ### Commit
 Fix duplicate names for binary stars by adding the component letter (61 Cyg A / B)
+
+
+
+---
+## Entry 9 – 2026-11-06, 01:48 – feature2-visualising-star-chart
+### Prompt
+Context: Feature 2 must be "3D Visualising the Star Chart". Claude compared WPF's built-in
+Viewport3D with the HelixToolkit library and recommended HelixToolkit (built-in mouse zoom, pan
+and rotate, ready-made spheres and 3D text). I checked the spec: it has no rule against libraries,
+and the module leader's example also uses HelixToolkit. I said:
+
+> lets start. As i dont have much time so lets start right now
+
+### Response
+Claude checked NuGet. HelixToolkit.Wpf 3.1.2 is newest but v3 is a big rewrite that Claude is
+less sure of, so it recommended v2: HelixToolkit.Wpf 2.27.3, installed with
+`dotnet add ... package HelixToolkit.Wpf --version 2.27.3`.
+
+The build succeeded but showed warning NU1701: the package "was restored using
+.NETFramework,Version=v4.6.1 ... v4.8.1 instead of the project target framework
+net10.0-windows7.0. This package may not be fully compatible with your project."
+
+Claude then found HelixToolkit.Core.Wpf 2.27.3: the same v2 library, built for .NET Core 3.1 and
+compatible with .NET 10. I removed HelixToolkit.Wpf and added HelixToolkit.Core.Wpf. The build
+then said "compatible with all the specified frameworks", 0 warnings, 0 errors.
+
+### Critique
+The AI's first package choice was wrong. HelixToolkit.Wpf only has .NET Framework versions, so
+on my .NET 10 project it gave warning NU1701. The build still succeeded, so I could have missed
+it, but it might have caused strange errors later. I did not ignore the warning. The AI found
+HelixToolkit.Core.Wpf, the same library built for modern .NET, and now there are 0 warnings.
+
+I chose version 2 instead of the newest version 3, because v3 is a big rewrite and the AI is
+less sure of its code, so it could make up code that does not exist. Version 2 is in maintenance
+mode, which is fine for this project.
+
+### Commit
+Add HelixToolkit.Core.Wpf 2.27.3 for 3D rendering
+
+
+
+---
+## Entry 10 – 2026-11-06, 02:06 – feature2-visualising-star-chart
+### Prompt
+> In MainWindow.xaml, add a HelixToolkit HelixViewport3D called StarViewport that fills the
+> window. Give it a black background, a perspective camera looking towards the Sun at (0,0,0),
+> and default lighting. Make the window bigger (1200 by 800) and keep the existing title code
+> working. Don't draw any stars yet; that's the next step.
+
+### Response
+Claude replaced MainWindow.xaml (see this commit):
+- added xmlns:h="http://helix-toolkit.org/wpf" and a HelixViewport3D named StarViewport,
+  Background Black, with the coordinate system arrows and view cube shown
+- PerspectiveCamera at (0,0,30) looking at (0,0,0), because the furthest star is about
+  20.5 parsecs away, so all stars will fit; near plane 0.01, far plane 1000
+- DefaultLights; window 1200 x 800; MainWindow.xaml.cs not changed
+It said it was not 100% sure the Core package uses the same xmlns address, and that the build
+would confirm it.
+
+### Critique
+It works: the window is black and 1200 x 800, the title still shows 2000 stars loaded, and I
+can rotate the view with the right mouse button. The AI was honest that it was not sure about
+the xmlns address for the Core package, so I checked it by building and running.
+
+The coordinate arrows are useful now because there is nothing else to see, but I might remove
+them later. The camera distance of 30 is based on my data, but if I changed stars.csv it would
+need changing too, so a fixed number is a weak point.
+
+### Commit
+Add black 3D HelixViewport3D with camera looking at the Sun
+
+
+
+
+---
+## Entry 11 – 2026-11-06, 02:15 – feature2-visualising-star-chart
+### Prompt
+> Create a new class StarRenderer in the StarChart3D namespace that draws every star in a
+> StarCollection into the HelixViewport3D as a small sphere at its X, Y, Z position (in parsecs).
+> Put all the spheres in one mesh so 2000 stars draw quickly. Make all stars white for now;
+> colours by spectral class are the next step. In MainWindow.xaml.cs, call StarRenderer after the
+> stars load. Don't change Star.cs, StarCollection.cs or CatalogueNames.cs.
+
+### Response
+Claude wrote StarRenderer.cs (see this commit): it adds one ModelVisual3D to the viewport, and
+Draw() uses HelixToolkit's MeshBuilder.AddSphere for every star (radius 0.1 parsecs, low detail)
+and ToMesh to make one mesh. It used a glowing (emissive) white material on top of black, which
+I did not ask for, so stars look evenly bright. In MainWindow.xaml.cs it added a starRenderer
+field, creates it after InitializeComponent, and calls Draw after the stars load. It also fixed
+the indentation in my test method. It said MeshBuilder, AddSphere and ToMesh exist in v2 but
+the build is the real test.
+
+Result: 2000 white dots in a ball shape around the Sun, which I can rotate.
+
+### Critique
+It works: I can see all the stars as white dots, and they make a ball shape because I chose the
+2000 nearest stars. The drawing code is in its own class, StarRenderer, not in MainWindow, which
+is better design. The Helix names the AI used were real, because the build had no errors.
+
+One mesh is fast, but it means all stars are one object, so I cannot click or colour one star
+on its own. For colours I will need one mesh per colour. The Sun looks the same as every other
+star, so it is hard to see where the centre is. The AI also added the glowing material without
+me asking, but I kept it because it looks better.
+
+### Commit
+Draw all 2000 stars as small white spheres in one mesh (StarRenderer)
+
+
+---
+## Entry 12 – 2026-11-06, 02:46 – feature2-visualising-star-chart
+### Prompt
+Context: Claude first checked my spect column and found messy values (D, d, sd, lowercase m/k/g,
+pec, S and 150 blanks), so I asked my domain expert (domain log Entry 2). I sent Claude the
+expert's full answer.
+
+### Response
+Claude checked the expert's rules against stars.csv: every star gets a class. It found that the
+expert's text and code disagree for white dwarfs (DC5 "white" in the text, F in the code, B by the
+expert's own formula 50400/n), so it used the formula with the temperature table for all white
+dwarfs. It chose grey for blank types instead of the ci/absmag fallback, so Star.cs and
+StarCollection.cs did not need changing (only 67 of the 150 blanks have ci).
+
+Code (see this commit):
+- new SpectralColours.cs: chart-style colours per class, grey for unknown, GetSpectralClass()
+  strips old prefixes (d, sd, esd, usd, c, g) with a regex, handles white dwarfs by temperature,
+  S → M, lowercase m/k/g → M/K/G
+- StarRenderer.cs: groups stars by colour, one mesh per colour, glowing material in that colour
+- MainWindow.xaml.cs: new WriteSpectralColourTest() writes the count per class to Output
+
+Result when I ran it:
+```
+Spectral colour test:
+  unknown (grey): 151 stars
+  B: 17 stars
+  A: 52 stars
+  F: 133 stars
+  G: 186 stars
+  K: 417 stars
+  M: 1044 stars
+  id 0 Sol: spect 'G2V' -> class G
+  id 32263 Sirius: spect 'A0m...' -> class A
+  id 87665 Barnard's Star: spect 'sdM4' -> class M
+  id 118441 Gl 244B: spect 'DA2' -> class B
+```
+
+### Critique
+The stars are now coloured and the counts add up to 2000. Most stars are red M dwarfs, which
+makes sense for the nearest stars. The AI caught that my domain expert was inconsistent about
+white dwarfs and fixed it by using one rule.
+
+The AI chose grey for unknown stars instead of the expert's ci fallback, to avoid changing
+Star.cs again. That is simpler but less accurate, so 151 stars have no real colour. Grouping by
+colour means 7 meshes instead of 1, which is still fast. I still cannot click on one star,
+because each colour is one big mesh.
+### Commit
+Colour stars by spectral class using domain expert rules (SpectralColours)
+
+
+
+
+---
+## Entry 13 – 2026-11-06, 03:00 – feature2-visualising-star-chart
+### Prompt
+> Add star name labels to the 3D view. Every star should show its display name from
+> CatalogueNames, as small text just next to its sphere, that always faces the camera. Draw all
+> the labels as one group so 2000 labels stay fast. Put this in StarRenderer, not MainWindow.
+> Don't change the colours or the other classes.
+
+### Response
+Claude updated StarRenderer.cs (see this commit):
+- the old sphere code moved unchanged into DrawSpheres(); new DrawLabels() makes one
+  BillboardTextItem per star with its CatalogueNames display name, 0.15 parsecs above the star
+- all labels go into one HelixToolkit BillboardTextGroupVisual3D (light grey, transparent
+  background, font size 10), added to the viewport once
+- no other class was changed
+It warned that it was not 100% sure of every Helix property name (HorizontalAlignment,
+VerticalAlignment, Items), that a transparent background in WPF 3D can show as black boxes,
+and that 2000 labels would be crowded until the filter is added.
+
+### Critique
+
+ It built without errors and the star names show next to the stars and keep facing the
+camera when I rotate, so the Helix names the AI used were real this time.
+
+With all 2000 names on screen it is very crowded and hard to read, especially in the
+middle where the stars are close together. That is why the next step is the filter for
+stars without a proper name. Putting all labels in one group keeps it fast, but it also
+means I cannot hide or change one label on its own.
+
+### Commit
+Add star name labels with one BillboardTextGroupVisual3D (StarRenderer)
+
+
+---
+## Entry 14 – 2026-11-06, 03:05 – feature2-visualising-star-chart
+### Prompt
+> Add a filter to StarRenderer so Draw can show only the stars that have a proper name (not a
+> generated catalogue name). Add a parameter to Draw for this. When the filter is on, hide both
+> the sphere and the label of stars without a proper name. Draw should return how many stars it
+> drew. In MainWindow, turn the filter on for now so I can test it; the on/off switch is the next
+> step. Don't change the other classes.
+
+### Response
+Claude changed StarRenderer.cs (see this commit): Draw(stars, onlyProperNames) now filters the
+stars with a new HasProperName() helper, passes the same filtered list to DrawSpheres and
+DrawLabels, and returns how many stars were drawn. In MainWindow.xaml.cs, Draw is called with
+onlyProperNames: true and the title shows "N stars loaded, M shown".
+
+### Critique
+It works: only the named stars show now, like Sirius, Procyon, Vega and Altair, and the names
+are readable, with Sol in the middle.
+
+The middle is still crowded, because the nearest stars are close to the Sun, so names like Sol,
+Proxima Centauri and Wolf 359 overlap. Some labels have a small bar at the start or look cut
+off at the end, which I will try to fix later. I also found that some "proper names" in HYG are
+really old Gould numbers like "268 G. Cet", so the filter counts them as named stars.
+
+### Commit
+Add filter to draw only stars with a proper name (StarRenderer.Draw)
+
+
+
+---
+## Entry 15 – 2026-11-06, 03:09 – feature2-visualising-star-chart
+### Prompt
+> Add a checkbox in the top-left corner of the window, on top of the 3D view, labelled "Only show
+> stars with a proper name". When it is ticked, redraw with the filter on; when it is unticked,
+> show all stars. Start with it unticked. Update the title with how many stars are shown each time
+> it changes. Make the checkbox text readable on the black background. Don't change StarRenderer
+> or the other classes.
+
+### Response
+Claude changed (see this commit):
+- MainWindow.xaml: a Border in the top-left with a dark see-through background (#B0202020) holding
+  a white CheckBox "Only show stars with a proper name", unticked at start, Focusable="False"
+- MainWindow.xaml.cs: new RedrawStars() reads the checkbox, calls StarRenderer.Draw and sets the
+  title; new ProperNameFilterCheckBox_Changed() calls RedrawStars() when it is ticked or unticked
+It said it made the checkbox not focusable so the space key will not tick it once keyboard
+controls are added, but that this means it can only be switched with the mouse.
+
+Result: unticked = "2000 stars loaded, 2000 shown", ticked = "2000 stars loaded, 89 shown".
+
+### Critique
+The filter is now switchable, which the demo form asks for. Ticking shows 89 stars and unticking
+shows all 2000, and the title updates every time, so it is easy to prove in the demo. The checkbox
+is readable because of the dark panel behind it.
+
+With all 2000 stars the labels are far too crowded to read, so a later commit could turn labels on
+and off. The AI made the checkbox not focusable, which helps the keyboard controls I add next, but
+it means you cannot use the keyboard to tick it, which is worse for accessibility.
+
+### Commit
+Add switchable filter checkbox for stars with a proper name
+
+
+
+---
+## Entry 16 – 2026-11-06, 03:14 – feature2-visualising-star-chart
+### Prompt
+> Set up the mouse controls of the HelixViewport3D in MainWindow.xaml: the mouse wheel should zoom
+> towards where the mouse cursor points, right mouse drag should rotate, and middle mouse drag (or
+> Shift + right drag) should pan. Turn off inertia so the view stops when I let go. Show the
+> camera's position on screen so I can see the movement working. Explain which settings you used.
+> Don't change the C# files.
+
+### Response
+Claude added 5 HelixViewport3D settings in MainWindow.xaml (see this commit), with a comment
+listing the controls:
+- ZoomAroundMouseDownPoint="True" – zoom towards the point under the mouse
+- RotateGesture="RightClick" – right drag rotates
+- PanGesture="Shift+RightClick" – Shift + right drag pans
+- IsInertiaEnabled="False" – the view stops when the mouse is let go
+- ShowCameraInfo="True" – camera position and look direction shown bottom-left
+It did not set middle-drag panning because it said that is already Helix's default, but that
+this was from its knowledge and not tested. It said right-drag rotation already worked before.
+
+Result: the camera info moved from Position 0,0,30 to -2.229,-0.560,65.240 after zooming out
+and panning.
+
+### Critique
+It built first time, so the Helix property names were correct. The camera info box proves the
+mouse moves the camera: the position changed from 0,0,30 to about -2.2,-0.6,65.2 after I zoomed
+out and panned. Zooming towards the cursor worked. Middle-drag also panned, so the AI's claim about
+the Helix default was right.
+
+The AI was honest that it had not tested the middle button. Right-drag already worked before, so
+that setting only makes it clear in the code. The camera info box is useful for testing but takes
+space on screen, so I may turn it off later.
+
+### Commit
+Set up mouse zoom, rotate and pan, turn off inertia, show camera info
+
+
+
+---
+## Entry 17 – 2026-11-07, 21:05 – feature2-visualising-star-chart
+### Prompt
+> Add keyboard controls for the 3D camera, in a new class KeyboardCameraController (not in
+> MainWindow): + and − zoom in and out towards the point the camera looks at, the arrow keys pan
+> up/down/left/right, W A S D rotate around the point the camera looks at, and Home resets the
+> camera to where it started. Steps should be relative to the distance, so they work both near
+> and far. In MainWindow, send key presses to this class. Don't change StarRenderer or the other
+> classes.
+
+### Response
+Claude wrote KeyboardCameraController.cs (see this commit):
+- HandleKey(Key) returns true if it used the key: + / - (main keyboard and number pad) zoom,
+  arrows pan, W A S D rotate, Home resets
+- Zoom moves 10% of the distance to the target and stops at 0.2 and 500 parsecs; pan moves 5% of
+  the distance; rotate turns 5 degrees around the target with RotateTransform3D
+- the start camera is remembered in the constructor for Home
+In MainWindow.xaml.cs it added the controller field, and a PreviewKeyDown handler that passes
+keys to the controller and marks them handled, so they reach it before HelixToolkit. It said it
+could not test this itself, and that Home only goes back to the very first camera.
+
+Result: all keys work: zoom, pan, rotate and Home back to 0,0,30.
+
+### Critique
+The keyboard controls work, so Feature 2 now covers zoom, pan and scan with the mouse and the
+keyboard, which the spec asks for. The code is in its own class, not MainWindow, and the steps
+are a fraction of the distance, so it feels the same near and far. Home is useful when I get lost.
+
+The AI could not test it, so I checked every key myself. Using PreviewKeyDown means my keys win
+over HelixToolkit's own keys. If Feature 3 moves the camera to a star, Home will still go back to
+the very first view, so I may need to change that later. The step sizes (10%, 5%, 5 degrees) are
+fixed numbers I picked without testing other values.
+
+### Commit
+Add keyboard camera controls: zoom, pan, rotate and reset (KeyboardCameraController)
