@@ -70,6 +70,7 @@ namespace StarChart3D
 
             WriteCatalogueNameTest();
             WriteSpectralColourTest();
+            WriteRouteTest();
         }
 
         /// <summary>
@@ -168,6 +169,32 @@ namespace StarChart3D
                     Debug.WriteLine($"  id {id} {CatalogueNames.GetDisplayName(star)}: spect '{star.SpectralType}' -> class {SpectralColours.GetSpectralClass(star.SpectralType)}");
                 }
             }
+        }
+
+        /// <summary>
+        /// Writes some routes from the Sun to the Output window, so the distance, bearing and path
+        /// can be checked against the domain expert's example (Sun to Rigil Kentaurus).
+        /// </summary>
+        private void WriteRouteTest()
+        {
+            Debug.WriteLine("Route test:");
+            Star? sun = starCollection.Stars.FirstOrDefault(s => s.Id == 0);
+            if (sun == null)
+            {
+                Debug.WriteLine("  Sun not found");
+                return;
+            }
+
+            foreach (int id in new[] { 71456, 70666, 32263, 87665, 71453 })
+            {
+                Star? target = starCollection.Stars.FirstOrDefault(s => s.Id == id);
+                if (target != null)
+                {
+                    Debug.WriteLine($"  Sol -> {CatalogueNames.GetDisplayName(target)}: {Navigation.GetRoute(sun, target).ToDisplayString()}");
+                }
+            }
+
+            Debug.WriteLine($"  Sol -> Sol: {Navigation.GetRoute(sun, sun).ToDisplayString()}");
         }
     }
 }
