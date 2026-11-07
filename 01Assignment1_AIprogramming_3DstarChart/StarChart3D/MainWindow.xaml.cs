@@ -1,6 +1,7 @@
 ﻿using System.Diagnostics;
 using System.IO;
 using System.Windows;
+using System.Windows.Input;
 
 namespace StarChart3D
 {
@@ -18,6 +19,9 @@ namespace StarChart3D
         /// <summary>Draws the stars into the 3D view.</summary>
         private readonly StarRenderer starRenderer;
 
+        /// <summary>Moves the 3D camera with the keyboard.</summary>
+        private readonly KeyboardCameraController keyboardCameraController;
+
         /// <summary>
         /// Creates the window and asks for the stars to be loaded once it has opened.
         /// </summary>
@@ -25,7 +29,9 @@ namespace StarChart3D
         {
             InitializeComponent();
             starRenderer = new StarRenderer(StarViewport);
+            keyboardCameraController = new KeyboardCameraController(StarViewport);
             Loaded += MainWindow_Loaded;
+            PreviewKeyDown += MainWindow_PreviewKeyDown;
         }
 
         /// <summary>
@@ -75,6 +81,18 @@ namespace StarChart3D
             bool onlyProperNames = ProperNameFilterCheckBox.IsChecked == true;
             int starsDrawn = starRenderer.Draw(starCollection, onlyProperNames);
             Title = $"Star Chart 3D - {starCollection.Count} stars loaded, {starsDrawn} shown";
+        }
+
+        /// <summary>
+        /// Runs when a key is pressed anywhere in the window. Camera keys are passed to the
+        /// keyboard controller; if it uses the key, the key is marked as handled.
+        /// </summary>
+        private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            if (keyboardCameraController.HandleKey(e.Key))
+            {
+                e.Handled = true;
+            }
         }
 
         /// <summary>

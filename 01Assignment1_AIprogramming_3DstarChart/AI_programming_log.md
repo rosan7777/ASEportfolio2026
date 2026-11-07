@@ -579,8 +579,8 @@ and panning.
 ### Critique
 It built first time, so the Helix property names were correct. The camera info box proves the
 mouse moves the camera: the position changed from 0,0,30 to about -2.2,-0.6,65.2 after I zoomed
-out and panned. [Zooming towards the cursor worked / did not work.] [Middle-drag panned / did
-not pan, so the AI's claim about the default was right / wrong.]
+out and panned. Zooming towards the cursor worked. Middle-drag also panned, so the AI's claim about
+the Helix default was right.
 
 The AI was honest that it had not tested the middle button. Right-drag already worked before, so
 that setting only makes it clear in the code. The camera info box is useful for testing but takes
@@ -588,3 +588,41 @@ space on screen, so I may turn it off later.
 
 ### Commit
 Set up mouse zoom, rotate and pan, turn off inertia, show camera info
+
+
+
+---
+## Entry 17 – 2026-11-07, 21:05 – feature2-visualising-star-chart
+### Prompt
+> Add keyboard controls for the 3D camera, in a new class KeyboardCameraController (not in
+> MainWindow): + and − zoom in and out towards the point the camera looks at, the arrow keys pan
+> up/down/left/right, W A S D rotate around the point the camera looks at, and Home resets the
+> camera to where it started. Steps should be relative to the distance, so they work both near
+> and far. In MainWindow, send key presses to this class. Don't change StarRenderer or the other
+> classes.
+
+### Response
+Claude wrote KeyboardCameraController.cs (see this commit):
+- HandleKey(Key) returns true if it used the key: + / - (main keyboard and number pad) zoom,
+  arrows pan, W A S D rotate, Home resets
+- Zoom moves 10% of the distance to the target and stops at 0.2 and 500 parsecs; pan moves 5% of
+  the distance; rotate turns 5 degrees around the target with RotateTransform3D
+- the start camera is remembered in the constructor for Home
+In MainWindow.xaml.cs it added the controller field, and a PreviewKeyDown handler that passes
+keys to the controller and marks them handled, so they reach it before HelixToolkit. It said it
+could not test this itself, and that Home only goes back to the very first camera.
+
+Result: all keys work: zoom, pan, rotate and Home back to 0,0,30.
+
+### Critique
+The keyboard controls work, so Feature 2 now covers zoom, pan and scan with the mouse and the
+keyboard, which the spec asks for. The code is in its own class, not MainWindow, and the steps
+are a fraction of the distance, so it feels the same near and far. Home is useful when I get lost.
+
+The AI could not test it, so I checked every key myself. Using PreviewKeyDown means my keys win
+over HelixToolkit's own keys. If Feature 3 moves the camera to a star, Home will still go back to
+the very first view, so I may need to change that later. The step sizes (10%, 5%, 5 degrees) are
+fixed numbers I picked without testing other values.
+
+### Commit
+Add keyboard camera controls: zoom, pan, rotate and reset (KeyboardCameraController)
