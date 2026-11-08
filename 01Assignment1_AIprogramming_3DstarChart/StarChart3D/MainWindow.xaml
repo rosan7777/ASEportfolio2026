@@ -56,5 +56,43 @@
                       Checked="ProperNameFilterCheckBox_Changed"
                       Unchecked="ProperNameFilterCheckBox_Changed" />
         </Border>
+
+        <!-- Feature 3: "Nearby stars" panel in the top-right corner, on top of the 3D view.
+             Shows the current star and the 10 stars nearest to it, with distance, bearing and path. -->
+        <Border HorizontalAlignment="Right"
+                VerticalAlignment="Top"
+                Margin="10"
+                Padding="10"
+                Width="330"
+                Background="#B0202020"
+                CornerRadius="4">
+            <StackPanel>
+                <TextBlock Text="Nearby stars"
+                           Foreground="White"
+                           FontSize="16"
+                           FontWeight="Bold" />
+                <TextBlock x:Name="CurrentStarText"
+                           Foreground="LightGray"
+                           Margin="0,4,0,8"
+                           TextWrapping="Wrap" />
+                <ListBox x:Name="NearbyStarsList"
+                         Background="Transparent"
+                         BorderThickness="0"
+                         MaxHeight="520">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel Margin="0,2">
+                                <TextBlock Text="{Binding Name}"
+                                           Foreground="White"
+                                           FontWeight="SemiBold" />
+                                <TextBlock Text="{Binding RouteText}"
+                                           Foreground="LightGray"
+                                           FontSize="11" />
+                            </StackPanel>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </StackPanel>
+        </Border>
     </Grid>
 </Window>

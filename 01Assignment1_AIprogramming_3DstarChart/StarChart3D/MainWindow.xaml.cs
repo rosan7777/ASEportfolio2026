@@ -20,6 +20,9 @@ namespace StarChart3D
         /// <summary>How long a flight to a star takes, in seconds.</summary>
         private const double FlightSeconds = 3.0;
 
+        /// <summary>How many stars the "Nearby stars" list shows.</summary>
+        private const int NearbyStarCount = 10;
+
         /// <summary>All the stars loaded from the data file.</summary>
         private readonly StarCollection starCollection = new StarCollection();
 
@@ -31,6 +34,9 @@ namespace StarChart3D
 
         /// <summary>Flies the 3D camera smoothly to a star.</summary>
         private readonly CameraAnimator cameraAnimator;
+
+        /// <summary>The star the user is currently at. Starts as the Sun.</summary>
+        private Star? currentStar;
 
         /// <summary>
         /// Creates the window and asks for the stars to be loaded once it has opened.
@@ -47,7 +53,7 @@ namespace StarChart3D
 
         /// <summary>
         /// Runs when the window has opened: loads the stars, draws them, flies the camera to the
-        /// Sun, and writes the count, the first 3 stars and the tests to the Output window.
+        /// Sun, lists the nearby stars, and writes the tests to the Output window.
         /// If loading fails, an error message is shown instead of crashing.
         /// </summary>
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
@@ -71,11 +77,14 @@ namespace StarChart3D
 
             RedrawStars();
 
-            // Feature 3: animate from the overview towards the initial star system, the Sun.
+            // Feature 3: animate from the overview towards the initial star system, the Sun,
+            // and list the stars near it.
             Star? sun = starCollection.Stars.FirstOrDefault(s => s.Id == 0);
             if (sun != null)
             {
+                currentStar = sun;
                 cameraAnimator.AnimateTo(new Point3D(sun.X, sun.Y, sun.Z), StarViewDistance, FlightSeconds);
+                ShowNearbyStars(sun);
             }
 
             Debug.WriteLine($"Loaded {starCollection.Count} stars from {filePath}");
@@ -100,6 +109,24 @@ namespace StarChart3D
             bool onlyProperNames = ProperNameFilterCheckBox.IsChecked == true;
             int starsDrawn = starRenderer.Draw(starCollection, onlyProperNames);
             Title = $"Star Chart 3D - {starCollection.Count} stars loaded, {starsDrawn} shown";
+        }
+
+        /// <summary>
+        /// Shows the current star above the list, and fills the "Nearby stars" list with the
+        /// stars nearest to it and the route to each (distance, bearing and path).
+        /// </summary>
+        /// <param name="current">The star the user is at.</param>
+        private void ShowNearbyStars(Star current)
+        {
+            CurrentStarText.Text = $"Current star: {CatalogueNames.GetDisplayName(current)}";
+
+            NearbyStarsList.ItemsSource = starCollection
+                .GetNearestStars(current, NearbyStarCount)
+                .Select(star => new NearbyStar(
+                    star,
+                    CatalogueNames.GetDisplayName(star),
+                    Navigation.GetRoute(current, star).ToDisplayString()))
+                .ToList();
         }
 
         /// <summary>
