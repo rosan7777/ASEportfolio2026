@@ -670,3 +670,39 @@ need to explain in the demo because it is not "up" on my screen.
 
 ### Commit
 Add Navigation: distance in light years, bearing and path between stars
+
+
+---
+## Entry 19 – 2026-11-08, 06:52 – feature3-3d_movement
+### Prompt
+> Create a new class CameraAnimator in the StarChart3D namespace that smoothly animates the 3D
+> camera to look at a given star from close by, over about 3 seconds, easing in and out. Use WPF's
+> own frame timing, not HelixToolkit's camera animation. When the app starts, the camera should
+> start far away and animate towards the Sun (Sol), the initial star system. Keep the keyboard and
+> mouse controls working after the animation. Don't change StarRenderer or the other classes.
+
+### Response
+Claude wrote CameraAnimator.cs (see this commit):
+- AnimateTo(target, viewDistance, seconds): the camera turns to face the target and ends
+  viewDistance away from it, looking at it
+- uses CompositionTarget.Rendering (once per screen frame) and a Stopwatch, with "smoothstep"
+  easing progress² × (3 − 2 × progress), so it starts and ends slowly
+- IsAnimating property and an AnimationCompleted event; it stops listening for frames at the end
+In MainWindow.xaml.cs: constants StarViewDistance = 2 parsecs and FlightSeconds = 3, a
+cameraAnimator field, a flight to the Sun after the stars are drawn, and camera keys ignored while
+the camera is flying. It said mouse drags during the flight get overwritten by the animation.
+
+Result: after 3 seconds the camera info shows Position 0,0,2, LookDirection 0,0,-2, Target 0,0,0.
+
+### Critique
+It works: the camera flies in from outside the stars and stops 2 parsecs from Sol, and the
+camera info shows exactly 0,0,2 looking at 0,0,0. [The flight was smooth and slowed down at the
+end.] It uses WPF's frame timing instead of HelixToolkit's LookAt, so it is different from the
+module leader's example and I understand how it works.
+
+Close to the Sun the stars look very big, because every star sphere is 0.1 parsecs wide, which is
+not realistic. Toliman and Rigil Kentaurus are so close that their spheres and labels overlap. If
+I drag the mouse during the flight, the animation overwrites it, so you have to wait 3 seconds.
+
+### Commit
+Add CameraAnimator: smooth flight to the Sun when the app starts
