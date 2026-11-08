@@ -626,3 +626,212 @@ fixed numbers I picked without testing other values.
 
 ### Commit
 Add keyboard camera controls: zoom, pan, rotate and reset (KeyboardCameraController)
+
+
+---
+## Entry 18 – 2026-11-07, 23:35 – feature3-3d_movement
+### Prompt
+Context: Feature 3 needs "distance (light years), bearing (degrees) and path (degrees)". I asked
+my domain expert how to calculate them (domain log Entry 3) and sent Claude the expert's full answer.
+
+### Response
+Claude first checked the expert's formulas against my stars.csv: bearing and path match the
+expert's example (Sol to Rigil Kentaurus 219.9°, -60.8°), but the distance in my data is 4.32 ly,
+not the 4.37 ly the expert quoted. It also found that Rigil Kentaurus and Toliman are less than
+0.01 ly apart.
+
+It wrote Navigation.cs (see this commit):
+- record Route(DistanceLightYears, BearingDegrees?, PathDegrees?) with ToDisplayString(), showing
+  "< 0.01 ly" for tiny distances and "—" for missing angles
+- static Navigation.GetRoute(from, to): dx, dy, dz, bearing = atan2(dy, dx) in 0–360,
+  path = atan2(dz, horizontal) in -90 to +90, null angles for the same star or straight up/down
+- MainWindow.xaml.cs: new WriteRouteTest() writes routes from Sol to the Output window
+It first said Sol -> Sol would print "0.00 ly", then corrected itself to "< 0.01 ly".
+
+Result when I ran it:
+```
+Route test:
+  Sol -> Rigil Kentaurus: 4.32 ly, bearing 219.9°, path -60.8°
+  Sol -> Proxima Centauri: 4.23 ly, bearing 217.4°, path -62.7°
+  Sol -> Sirius: 8.60 ly, bearing 101.3°, path -16.7°
+  Sol -> Barnard's Star: 5.95 ly, bearing 269.5°, path 4.7°
+  Sol -> Toliman: 4.32 ly, bearing 219.9°, path -60.8°
+  Sol -> Sol: < 0.01 ly, bearing —, path —
+```
+
+### Critique
+The route maths works and matches my domain expert's example for bearing and path. The AI also
+checked the distance against my real data and found the expert's 4.37 ly was not from my file.
+
+One small flaw: for the same star it shows "< 0.01 ly", when "0 ly" would be more honest. The AI
+also made a mistake in its first explanation (it said "0.00 ly") and then corrected itself. The
+bearing and path use the equatorial axes, so "up" means towards the north celestial pole, which I
+need to explain in the demo because it is not "up" on my screen.
+
+### Commit
+Add Navigation: distance in light years, bearing and path between stars
+
+
+---
+## Entry 19 – 2026-11-08, 06:52 – feature3-3d_movement
+### Prompt
+> Create a new class CameraAnimator in the StarChart3D namespace that smoothly animates the 3D
+> camera to look at a given star from close by, over about 3 seconds, easing in and out. Use WPF's
+> own frame timing, not HelixToolkit's camera animation. When the app starts, the camera should
+> start far away and animate towards the Sun (Sol), the initial star system. Keep the keyboard and
+> mouse controls working after the animation. Don't change StarRenderer or the other classes.
+
+### Response
+Claude wrote CameraAnimator.cs (see this commit):
+- AnimateTo(target, viewDistance, seconds): the camera turns to face the target and ends
+  viewDistance away from it, looking at it
+- uses CompositionTarget.Rendering (once per screen frame) and a Stopwatch, with "smoothstep"
+  easing progress² × (3 − 2 × progress), so it starts and ends slowly
+- IsAnimating property and an AnimationCompleted event; it stops listening for frames at the end
+In MainWindow.xaml.cs: constants StarViewDistance = 2 parsecs and FlightSeconds = 3, a
+cameraAnimator field, a flight to the Sun after the stars are drawn, and camera keys ignored while
+the camera is flying. It said mouse drags during the flight get overwritten by the animation.
+
+Result: after 3 seconds the camera info shows Position 0,0,2, LookDirection 0,0,-2, Target 0,0,0.
+
+### Critique
+It works: the camera flies in from outside the stars and stops 2 parsecs from Sol, and the
+camera info shows exactly 0,0,2 looking at 0,0,0. The flight was smooth and slowed down at the
+end. It uses WPF's frame timing instead of HelixToolkit's LookAt, so it is different from the
+module leader's example and I understand how it works.
+
+Close to the Sun the stars look very big, because every star sphere is 0.1 parsecs wide, which is
+not realistic. Toliman and Rigil Kentaurus are so close that their spheres and labels overlap. If
+I drag the mouse during the flight, the animation overwrites it, so you have to wait 3 seconds.
+
+### Commit
+Add CameraAnimator: smooth flight to the Sun when the app starts
+
+## Entry 20 – 2026-11-08, 23:19 – feature3-3d_movement
+### Prompt
+> Add a panel on the right side of the window, on top of the 3D view, titled "Nearby stars". It
+> should list the 10 stars nearest to the current star (start with the Sun), each showing its
+> name, distance in light years, bearing and path, using Navigation.GetRoute. Put the code that
+> finds the nearest stars in StarCollection or a new class, not in MainWindow. Show which star you
+> are currently at above the list. Make the text readable on the black background. Clicking a star
+> will come in the next step. Don't change StarRenderer.
+
+### Response
+Claude added (see this commit):
+- StarCollection.GetNearestStars(from, count): leaves out the star itself, sorts the others by
+  squared distance (no square root needed just to sort) and returns the first count
+- NearbyStar.cs: a small record with the star, its display name and the route text
+- MainWindow.xaml: a dark see-through panel in the top-right corner with the title
+  "Nearby stars", a "Current star" line and a ListBox with the name in white and the route in
+  light grey
+- MainWindow.xaml.cs: a currentStar field, NearbyStarCount = 10, and ShowNearbyStars(), which
+  uses CatalogueNames.GetDisplayName and Navigation.GetRoute for each star; it is called with the
+  Sun after loading
+Before I ran it, it worked out the expected list from my stars.csv, starting with Proxima
+Centauri at 4.23 ly, bearing 217.4°, path -62.7°. It said the window still takes the arrow keys
+before the list, so they keep moving the camera.
+
+Result: the panel shows "Current star: Sol" and the 10 stars. All names, distances, bearings
+and paths match the expected list.
+
+### Critique
+It works and matches the expected values exactly, so the list part of Feature 3 is done. The
+search is in StarCollection, not MainWindow, as I asked, and it reuses Navigation and
+CatalogueNames instead of repeating that code.
+
+The panel background is see-through, so stars and labels behind it (for example the big star
+behind Wolf 359) make some rows harder to read. I will make it darker. Binary stars take two
+rows each with the same route (Toliman and Rigil Kentaurus, Gl 65A and Gl 65B, Sirius and
+Gl 244B), so 6 of the 10 rows are only 3 places. That is correct from the data but not very
+useful for navigation. The list does not change yet, because clicking a star is the next step.
+
+### Commit
+Add Nearby stars panel listing the 10 nearest stars with distance, bearing and path
+
+
+## Entry 21 – 2026-11-08, 23:30 – feature3-3d_movement
+### Prompt
+> When I click a star in the "Nearby stars" list, the camera should fly to that star using
+> CameraAnimator. When the flight has finished, that star should become the current star, and the
+> "Current star" line and the list should update to show the 10 stars nearest to it. While the
+> camera is flying, clicking the list should do nothing. Also make the panel background darker so
+> stars behind it don't make the text hard to read. Don't change StarRenderer, Navigation or
+> CameraAnimator.
+
+### Response
+Claude changed only MainWindow.xaml and MainWindow.xaml.cs (see this commit):
+- the panel background is now #F0101010 (almost solid) instead of #B0202020
+- the ListBox calls NearbyStarsList_SelectionChanged when a star is clicked: it remembers the
+  clicked star in a new destinationStar field and calls cameraAnimator.AnimateTo with the same
+  2 parsecs and 3 seconds as the first flight
+- if the camera is already flying, the click is ignored and the selection is cleared
+- the window now listens for CameraAnimator's AnimationCompleted event; when a flight to a clicked
+  star ends, that star becomes currentStar and ShowNearbyStars fills the list again (the first
+  flight to the Sun is skipped, because its list is already filled)
+It worked out the expected list from Barnard's Star from my stars.csv, and pointed out that the
+route back to the Sun should be the opposite direction: bearing 89.5° (180° round from 269.5°)
+and path -4.7°.
+
+Result: I clicked Rigil Kentaurus. The camera flew there, the line changed to "Current star:
+Rigil Kentaurus", and Sol showed 4.32 ly, bearing 39.9°, path 60.8°, the exact opposite of
+219.9° and -60.8° from the Sun. Clicking during the first flight did nothing.
+
+### Critique
+It works, so the main part of Feature 3 is done: click a local star, fly to it, and the list
+updates. The opposite bearing and path back to the Sun were a good check that Navigation is right
+from any star, not just the Sun. It used CameraAnimator's AnimationCompleted event, so it didn't
+need to change CameraAnimator, as I asked. The darker panel is now easy to read.
+
+Close up, the Rigil Kentaurus and Toliman spheres overlap and their labels are drawn on top of
+each other, because they are almost at the same position in the data (Toliman shows < 0.01 ly).
+At 2 parsecs the star spheres look very big. Many rows have catalogue names like HIP 82724
+instead of proper names. There is no dust animation yet, so moving still doesn't feel like
+travelling.
+
+### Commit
+Click a nearby star to fly there and update the list, darker Nearby stars panel
+
+
+## Entry 22 – 2026-11-08, 23:39 – feature3-3d_movement
+### Prompt
+> Add a "dust" animation to give the illusion of slow-speed motion through space. Create a new
+> class DustField in the StarChart3D namespace that draws a few hundred small, faint, grey points
+> in a box around the camera, as a separate visual in the 3D view. The dust should drift slowly
+> past the camera all the time, so it feels like we are moving even when the camera is still, and
+> points that go too far away should come back on the other side of the box so the dust never runs
+> out. While the camera is flying to a star, the dust should stream past faster in the direction of
+> travel. Keep the dust fainter and smaller than the stars so they can still be told apart. Use
+> WPF's own frame timing like CameraAnimator. Don't change StarRenderer, Navigation or
+> CameraAnimator.
+
+### Response
+Claude wrote DustField.cs (see this commit):
+- 400 points in a 3 parsec box around the camera, drawn with HelixToolkit's PointsVisual3D
+  (it checked that this class exists in HelixToolkit 2.27.3 before using it)
+- each point is stored as an offset from the camera; every frame (CompositionTarget.Rendering
+  with a Stopwatch) the offsets move by a slow drift of 0.15 parsecs per second towards the
+  camera, plus however far the camera moved since the last frame, so while flying the dust stays
+  still in space and streams past
+- Wrap() brings points that leave the box back in on the opposite side, even after a big jump
+- a fixed random seed, so the dust is the same every run; Start() and Stop() methods
+In MainWindow.xaml.cs it added a dustField field and starts it after the stars are drawn.
+It said it could not build or run it itself.
+
+Result: at first the dots were 1.5 pixels and dark grey (90, 90, 90) and were very hard to see in
+a screenshot, so I asked for them bigger and brighter: now 2.5 pixels and grey (140, 140, 140).
+The dust rushes past during flights and drifts slowly when the camera is still.
+
+### Critique
+It works and covers the last part of Feature 3: there is always a feeling of movement, and
+flights look faster because the dust streams past. It is in its own class and did not need any
+change to CameraAnimator, because it just measures how far the camera moved each frame.
+
+The first size and colour were too faint, so I had to check it on screen and change two numbers
+myself. Those numbers (400 points, 3 parsec box, 0.15 parsecs per second) were picked by the AI,
+not measured. The dust also moves when I zoom or pan with the mouse or keyboard, which is
+realistic but not what the spec asked for. A new list of points is made every frame, which works
+for 400 points but would be slow for many more. Real interstellar dust is far too thin to see, so
+this is only a visual effect, not real astronomy.
+
+### Commit
+Add DustField: drifting space dust that streams past when the camera flies

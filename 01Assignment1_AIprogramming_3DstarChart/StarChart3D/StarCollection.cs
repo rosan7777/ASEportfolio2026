@@ -90,6 +90,33 @@ namespace StarChart3D
         }
 
         /// <summary>
+        /// Returns the stars nearest to a given star, closest first. The star itself is left out.
+        /// </summary>
+        /// <param name="from">The star to measure from.</param>
+        /// <param name="count">How many stars to return.</param>
+        /// <returns>Up to count stars, sorted by distance from the given star.</returns>
+        public List<Star> GetNearestStars(Star from, int count)
+        {
+            return stars
+                .Where(star => star != from)
+                .OrderBy(star => DistanceSquared(from, star))
+                .Take(count)
+                .ToList();
+        }
+
+        /// <summary>
+        /// Returns the squared distance between two stars, in parsecs squared. The square root is not
+        /// needed just to sort by distance, so it is skipped to save time.
+        /// </summary>
+        private static double DistanceSquared(Star a, Star b)
+        {
+            double dx = b.X - a.X;
+            double dy = b.Y - a.Y;
+            double dz = b.Z - a.Z;
+            return dx * dx + dy * dy + dz * dz;
+        }
+
+        /// <summary>
         /// Removes spaces and surrounding quote marks from a field. A blank field becomes an empty string.
         /// </summary>
         private static string Clean(string field)

@@ -2,6 +2,7 @@
 using System.IO;
 using System.Windows;
 using System.Windows.Input;
+using System.Windows.Media.Media3D;
 
 namespace StarChart3D
 {
@@ -13,6 +14,15 @@ namespace StarChart3D
         /// <summary>The name of the star data file, copied next to the .exe on build.</summary>
         private const string StarFileName = "stars.csv";
 
+        /// <summary>How far from a star the camera stops after flying to it, in parsecs.</summary>
+        private const double StarViewDistance = 2.0;
+
+        /// <summary>How long a flight to a star takes, in seconds.</summary>
+        private const double FlightSeconds = 3.0;
+
+        /// <summary>How many stars the "Nearby stars" list shows.</summary>
+        private const int NearbyStarCount = 10;
+
         /// <summary>All the stars loaded from the data file.</summary>
         private readonly StarCollection starCollection = new StarCollection();
 
@@ -22,6 +32,21 @@ namespace StarChart3D
         /// <summary>Moves the 3D camera with the keyboard.</summary>
         private readonly KeyboardCameraController keyboardCameraController;
 
+        /// <summary>Flies the 3D camera smoothly to a star.</summary>
+        private readonly CameraAnimator cameraAnimator;
+
+        /// <summary>Draws the moving space dust that gives the feeling of travelling.</summary>
+        private readonly DustField dustField;
+
+        /// <summary>The star the user is currently at. Starts as the Sun.</summary>
+        private Star? currentStar;
+
+        /// <summary>
+        /// The star the camera is flying to after a click in the list. It becomes the current star
+        /// when the flight has finished. Null when no flight to a clicked star is happening.
+        /// </summary>
+        private Star? destinationStar;
+
         /// <summary>
         /// Creates the window and asks for the stars to be loaded once it has opened.
         /// </summary>
@@ -30,13 +55,16 @@ namespace StarChart3D
             InitializeComponent();
             starRenderer = new StarRenderer(StarViewport);
             keyboardCameraController = new KeyboardCameraController(StarViewport);
+            cameraAnimator = new CameraAnimator(StarViewport);
+            cameraAnimator.AnimationCompleted += CameraAnimator_AnimationCompleted;
+            dustField = new DustField(StarViewport);
             Loaded += MainWindow_Loaded;
             PreviewKeyDown += MainWindow_PreviewKeyDown;
         }
 
         /// <summary>
-        /// Runs when the window has opened: loads the stars, draws them, and writes the count,
-        /// the first 3 stars and the tests to the Output window.
+        /// Runs when the window has opened: loads the stars, draws them, flies the camera to the
+        /// Sun, lists the nearby stars, and writes the tests to the Output window.
         /// If loading fails, an error message is shown instead of crashing.
         /// </summary>
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
@@ -60,6 +88,19 @@ namespace StarChart3D
 
             RedrawStars();
 
+            // Feature 3: start the dust drifting, to give the illusion of slow motion through space.
+            dustField.Start();
+
+            // Feature 3: animate from the overview towards the initial star system, the Sun,
+            // and list the stars near it.
+            Star? sun = starCollection.Stars.FirstOrDefault(s => s.Id == 0);
+            if (sun != null)
+            {
+                currentStar = sun;
+                cameraAnimator.AnimateTo(new Point3D(sun.X, sun.Y, sun.Z), StarViewDistance, FlightSeconds);
+                ShowNearbyStars(sun);
+            }
+
             Debug.WriteLine($"Loaded {starCollection.Count} stars from {filePath}");
             for (int i = 0; i < 3 && i < starCollection.Count; i++)
             {
@@ -70,6 +111,7 @@ namespace StarChart3D
 
             WriteCatalogueNameTest();
             WriteSpectralColourTest();
+            WriteRouteTest();
         }
 
         /// <summary>
@@ -84,12 +126,70 @@ namespace StarChart3D
         }
 
         /// <summary>
+        /// Shows the current star above the list, and fills the "Nearby stars" list with the
+        /// stars nearest to it and the route to each (distance, bearing and path).
+        /// </summary>
+        /// <param name="current">The star the user is at.</param>
+        private void ShowNearbyStars(Star current)
+        {
+            CurrentStarText.Text = $"Current star: {CatalogueNames.GetDisplayName(current)}";
+
+            NearbyStarsList.ItemsSource = starCollection
+                .GetNearestStars(current, NearbyStarCount)
+                .Select(star => new NearbyStar(
+                    star,
+                    CatalogueNames.GetDisplayName(star),
+                    Navigation.GetRoute(current, star).ToDisplayString()))
+                .ToList();
+        }
+
+        /// <summary>
+        /// Runs when a star in the "Nearby stars" list is clicked: flies the camera to that star.
+        /// The list is only updated when the flight has finished (see CameraAnimator_AnimationCompleted).
+        /// While the camera is already flying, the click is ignored and the selection is cleared.
+        /// </summary>
+        private void NearbyStarsList_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+        {
+            if (NearbyStarsList.SelectedItem is not NearbyStar clicked)
+            {
+                return; // nothing selected, e.g. after the selection was cleared below
+            }
+
+            if (cameraAnimator.IsAnimating)
+            {
+                NearbyStarsList.SelectedItem = null;
+                return;
+            }
+
+            destinationStar = clicked.Star;
+            Star star = clicked.Star;
+            cameraAnimator.AnimateTo(new Point3D(star.X, star.Y, star.Z), StarViewDistance, FlightSeconds);
+        }
+
+        /// <summary>
+        /// Runs when the camera has finished flying. If it was flying to a star clicked in the list,
+        /// that star becomes the current star and the "Nearby stars" list is filled for it.
+        /// </summary>
+        private void CameraAnimator_AnimationCompleted(object? sender, EventArgs e)
+        {
+            if (destinationStar == null)
+            {
+                return; // the first flight to the Sun: the list was already filled for it
+            }
+
+            currentStar = destinationStar;
+            destinationStar = null;
+            ShowNearbyStars(currentStar);
+        }
+
+        /// <summary>
         /// Runs when a key is pressed anywhere in the window. Camera keys are passed to the
         /// keyboard controller; if it uses the key, the key is marked as handled.
+        /// While the camera is flying, camera keys are ignored so they don't fight the animation.
         /// </summary>
         private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
         {
-            if (keyboardCameraController.HandleKey(e.Key))
+            if (!cameraAnimator.IsAnimating && keyboardCameraController.HandleKey(e.Key))
             {
                 e.Handled = true;
             }
@@ -168,6 +268,32 @@ namespace StarChart3D
                     Debug.WriteLine($"  id {id} {CatalogueNames.GetDisplayName(star)}: spect '{star.SpectralType}' -> class {SpectralColours.GetSpectralClass(star.SpectralType)}");
                 }
             }
+        }
+
+        /// <summary>
+        /// Writes some routes from the Sun to the Output window, so the distance, bearing and path
+        /// can be checked against the domain expert's example (Sun to Rigil Kentaurus).
+        /// </summary>
+        private void WriteRouteTest()
+        {
+            Debug.WriteLine("Route test:");
+            Star? sun = starCollection.Stars.FirstOrDefault(s => s.Id == 0);
+            if (sun == null)
+            {
+                Debug.WriteLine("  Sun not found");
+                return;
+            }
+
+            foreach (int id in new[] { 71456, 70666, 32263, 87665, 71453 })
+            {
+                Star? target = starCollection.Stars.FirstOrDefault(s => s.Id == id);
+                if (target != null)
+                {
+                    Debug.WriteLine($"  Sol -> {CatalogueNames.GetDisplayName(target)}: {Navigation.GetRoute(sun, target).ToDisplayString()}");
+                }
+            }
+
+            Debug.WriteLine($"  Sol -> Sol: {Navigation.GetRoute(sun, sun).ToDisplayString()}");
         }
     }
 }
