@@ -35,6 +35,9 @@ namespace StarChart3D
         /// <summary>Flies the 3D camera smoothly to a star.</summary>
         private readonly CameraAnimator cameraAnimator;
 
+        /// <summary>Draws the moving space dust that gives the feeling of travelling.</summary>
+        private readonly DustField dustField;
+
         /// <summary>The star the user is currently at. Starts as the Sun.</summary>
         private Star? currentStar;
 
@@ -54,6 +57,7 @@ namespace StarChart3D
             keyboardCameraController = new KeyboardCameraController(StarViewport);
             cameraAnimator = new CameraAnimator(StarViewport);
             cameraAnimator.AnimationCompleted += CameraAnimator_AnimationCompleted;
+            dustField = new DustField(StarViewport);
             Loaded += MainWindow_Loaded;
             PreviewKeyDown += MainWindow_PreviewKeyDown;
         }
@@ -83,6 +87,9 @@ namespace StarChart3D
             }
 
             RedrawStars();
+
+            // Feature 3: start the dust drifting, to give the illusion of slow motion through space.
+            dustField.Start();
 
             // Feature 3: animate from the overview towards the initial star system, the Sun,
             // and list the stars near it.
