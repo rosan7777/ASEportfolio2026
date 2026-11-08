@@ -747,3 +747,46 @@ useful for navigation. The list does not change yet, because clicking a star is 
 
 ### Commit
 Add Nearby stars panel listing the 10 nearest stars with distance, bearing and path
+
+
+## Entry 21 – 2026-11-08, 23:30 – feature3-3d_movement
+### Prompt
+> When I click a star in the "Nearby stars" list, the camera should fly to that star using
+> CameraAnimator. When the flight has finished, that star should become the current star, and the
+> "Current star" line and the list should update to show the 10 stars nearest to it. While the
+> camera is flying, clicking the list should do nothing. Also make the panel background darker so
+> stars behind it don't make the text hard to read. Don't change StarRenderer, Navigation or
+> CameraAnimator.
+
+### Response
+Claude changed only MainWindow.xaml and MainWindow.xaml.cs (see this commit):
+- the panel background is now #F0101010 (almost solid) instead of #B0202020
+- the ListBox calls NearbyStarsList_SelectionChanged when a star is clicked: it remembers the
+  clicked star in a new destinationStar field and calls cameraAnimator.AnimateTo with the same
+  2 parsecs and 3 seconds as the first flight
+- if the camera is already flying, the click is ignored and the selection is cleared
+- the window now listens for CameraAnimator's AnimationCompleted event; when a flight to a clicked
+  star ends, that star becomes currentStar and ShowNearbyStars fills the list again (the first
+  flight to the Sun is skipped, because its list is already filled)
+It worked out the expected list from Barnard's Star from my stars.csv, and pointed out that the
+route back to the Sun should be the opposite direction: bearing 89.5° (180° round from 269.5°)
+and path -4.7°.
+
+Result: I clicked Rigil Kentaurus. The camera flew there, the line changed to "Current star:
+Rigil Kentaurus", and Sol showed 4.32 ly, bearing 39.9°, path 60.8°, the exact opposite of
+219.9° and -60.8° from the Sun. Clicking during the first flight did nothing.
+
+### Critique
+It works, so the main part of Feature 3 is done: click a local star, fly to it, and the list
+updates. The opposite bearing and path back to the Sun were a good check that Navigation is right
+from any star, not just the Sun. It used CameraAnimator's AnimationCompleted event, so it didn't
+need to change CameraAnimator, as I asked. The darker panel is now easy to read.
+
+Close up, the Rigil Kentaurus and Toliman spheres overlap and their labels are drawn on top of
+each other, because they are almost at the same position in the data (Toliman shows < 0.01 ly).
+At 2 parsecs the star spheres look very big. Many rows have catalogue names like HIP 82724
+instead of proper names. There is no dust animation yet, so moving still doesn't feel like
+travelling.
+
+### Commit
+Click a nearby star to fly there and update the list, darker Nearby stars panel
