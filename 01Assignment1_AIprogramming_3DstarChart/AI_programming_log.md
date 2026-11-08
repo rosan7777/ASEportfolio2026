@@ -706,3 +706,44 @@ I drag the mouse during the flight, the animation overwrites it, so you have to 
 
 ### Commit
 Add CameraAnimator: smooth flight to the Sun when the app starts
+
+## Entry 20 – 2026-11-08, 23:19 – feature3-3d_movement
+### Prompt
+> Add a panel on the right side of the window, on top of the 3D view, titled "Nearby stars". It
+> should list the 10 stars nearest to the current star (start with the Sun), each showing its
+> name, distance in light years, bearing and path, using Navigation.GetRoute. Put the code that
+> finds the nearest stars in StarCollection or a new class, not in MainWindow. Show which star you
+> are currently at above the list. Make the text readable on the black background. Clicking a star
+> will come in the next step. Don't change StarRenderer.
+
+### Response
+Claude added (see this commit):
+- StarCollection.GetNearestStars(from, count): leaves out the star itself, sorts the others by
+  squared distance (no square root needed just to sort) and returns the first count
+- NearbyStar.cs: a small record with the star, its display name and the route text
+- MainWindow.xaml: a dark see-through panel in the top-right corner with the title
+  "Nearby stars", a "Current star" line and a ListBox with the name in white and the route in
+  light grey
+- MainWindow.xaml.cs: a currentStar field, NearbyStarCount = 10, and ShowNearbyStars(), which
+  uses CatalogueNames.GetDisplayName and Navigation.GetRoute for each star; it is called with the
+  Sun after loading
+Before I ran it, it worked out the expected list from my stars.csv, starting with Proxima
+Centauri at 4.23 ly, bearing 217.4°, path -62.7°. It said the window still takes the arrow keys
+before the list, so they keep moving the camera.
+
+Result: the panel shows "Current star: Sol" and the 10 stars. All names, distances, bearings
+and paths match the expected list.
+
+### Critique
+It works and matches the expected values exactly, so the list part of Feature 3 is done. The
+search is in StarCollection, not MainWindow, as I asked, and it reuses Navigation and
+CatalogueNames instead of repeating that code.
+
+The panel background is see-through, so stars and labels behind it (for example the big star
+behind Wolf 359) make some rows harder to read. I will make it darker. Binary stars take two
+rows each with the same route (Toliman and Rigil Kentaurus, Gl 65A and Gl 65B, Sirius and
+Gl 244B), so 6 of the 10 rows are only 3 places. That is correct from the data but not very
+useful for navigation. The list does not change yet, because clicking a star is the next step.
+
+### Commit
+Add Nearby stars panel listing the 10 nearest stars with distance, bearing and path
