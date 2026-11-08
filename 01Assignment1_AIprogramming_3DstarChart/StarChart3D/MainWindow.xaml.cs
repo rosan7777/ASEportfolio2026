@@ -2,6 +2,7 @@
 using System.IO;
 using System.Windows;
 using System.Windows.Input;
+using System.Windows.Media.Media3D;
 
 namespace StarChart3D
 {
@@ -13,6 +14,12 @@ namespace StarChart3D
         /// <summary>The name of the star data file, copied next to the .exe on build.</summary>
         private const string StarFileName = "stars.csv";
 
+        /// <summary>How far from a star the camera stops after flying to it, in parsecs.</summary>
+        private const double StarViewDistance = 2.0;
+
+        /// <summary>How long a flight to a star takes, in seconds.</summary>
+        private const double FlightSeconds = 3.0;
+
         /// <summary>All the stars loaded from the data file.</summary>
         private readonly StarCollection starCollection = new StarCollection();
 
@@ -22,6 +29,9 @@ namespace StarChart3D
         /// <summary>Moves the 3D camera with the keyboard.</summary>
         private readonly KeyboardCameraController keyboardCameraController;
 
+        /// <summary>Flies the 3D camera smoothly to a star.</summary>
+        private readonly CameraAnimator cameraAnimator;
+
         /// <summary>
         /// Creates the window and asks for the stars to be loaded once it has opened.
         /// </summary>
@@ -30,13 +40,14 @@ namespace StarChart3D
             InitializeComponent();
             starRenderer = new StarRenderer(StarViewport);
             keyboardCameraController = new KeyboardCameraController(StarViewport);
+            cameraAnimator = new CameraAnimator(StarViewport);
             Loaded += MainWindow_Loaded;
             PreviewKeyDown += MainWindow_PreviewKeyDown;
         }
 
         /// <summary>
-        /// Runs when the window has opened: loads the stars, draws them, and writes the count,
-        /// the first 3 stars and the tests to the Output window.
+        /// Runs when the window has opened: loads the stars, draws them, flies the camera to the
+        /// Sun, and writes the count, the first 3 stars and the tests to the Output window.
         /// If loading fails, an error message is shown instead of crashing.
         /// </summary>
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
@@ -59,6 +70,13 @@ namespace StarChart3D
             }
 
             RedrawStars();
+
+            // Feature 3: animate from the overview towards the initial star system, the Sun.
+            Star? sun = starCollection.Stars.FirstOrDefault(s => s.Id == 0);
+            if (sun != null)
+            {
+                cameraAnimator.AnimateTo(new Point3D(sun.X, sun.Y, sun.Z), StarViewDistance, FlightSeconds);
+            }
 
             Debug.WriteLine($"Loaded {starCollection.Count} stars from {filePath}");
             for (int i = 0; i < 3 && i < starCollection.Count; i++)
@@ -87,10 +105,11 @@ namespace StarChart3D
         /// <summary>
         /// Runs when a key is pressed anywhere in the window. Camera keys are passed to the
         /// keyboard controller; if it uses the key, the key is marked as handled.
+        /// While the camera is flying, camera keys are ignored so they don't fight the animation.
         /// </summary>
         private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
         {
-            if (keyboardCameraController.HandleKey(e.Key))
+            if (!cameraAnimator.IsAnimating && keyboardCameraController.HandleKey(e.Key))
             {
                 e.Handled = true;
             }
