@@ -696,8 +696,8 @@ Result: after 3 seconds the camera info shows Position 0,0,2, LookDirection 0,0,
 
 ### Critique
 It works: the camera flies in from outside the stars and stops 2 parsecs from Sol, and the
-camera info shows exactly 0,0,2 looking at 0,0,0. [The flight was smooth and slowed down at the
-end.] It uses WPF's frame timing instead of HelixToolkit's LookAt, so it is different from the
+camera info shows exactly 0,0,2 looking at 0,0,0. The flight was smooth and slowed down at the
+end. It uses WPF's frame timing instead of HelixToolkit's LookAt, so it is different from the
 module leader's example and I understand how it works.
 
 Close to the Sun the stars look very big, because every star sphere is 0.1 parsecs wide, which is
