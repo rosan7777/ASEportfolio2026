@@ -790,3 +790,48 @@ travelling.
 
 ### Commit
 Click a nearby star to fly there and update the list, darker Nearby stars panel
+
+
+## Entry 22 – 2026-11-08, 23:39 – feature3-3d_movement
+### Prompt
+> Add a "dust" animation to give the illusion of slow-speed motion through space. Create a new
+> class DustField in the StarChart3D namespace that draws a few hundred small, faint, grey points
+> in a box around the camera, as a separate visual in the 3D view. The dust should drift slowly
+> past the camera all the time, so it feels like we are moving even when the camera is still, and
+> points that go too far away should come back on the other side of the box so the dust never runs
+> out. While the camera is flying to a star, the dust should stream past faster in the direction of
+> travel. Keep the dust fainter and smaller than the stars so they can still be told apart. Use
+> WPF's own frame timing like CameraAnimator. Don't change StarRenderer, Navigation or
+> CameraAnimator.
+
+### Response
+Claude wrote DustField.cs (see this commit):
+- 400 points in a 3 parsec box around the camera, drawn with HelixToolkit's PointsVisual3D
+  (it checked that this class exists in HelixToolkit 2.27.3 before using it)
+- each point is stored as an offset from the camera; every frame (CompositionTarget.Rendering
+  with a Stopwatch) the offsets move by a slow drift of 0.15 parsecs per second towards the
+  camera, plus however far the camera moved since the last frame, so while flying the dust stays
+  still in space and streams past
+- Wrap() brings points that leave the box back in on the opposite side, even after a big jump
+- a fixed random seed, so the dust is the same every run; Start() and Stop() methods
+In MainWindow.xaml.cs it added a dustField field and starts it after the stars are drawn.
+It said it could not build or run it itself.
+
+Result: at first the dots were 1.5 pixels and dark grey (90, 90, 90) and were very hard to see in
+a screenshot, so I asked for them bigger and brighter: now 2.5 pixels and grey (140, 140, 140).
+The dust rushes past during flights and drifts slowly when the camera is still.
+
+### Critique
+It works and covers the last part of Feature 3: there is always a feeling of movement, and
+flights look faster because the dust streams past. It is in its own class and did not need any
+change to CameraAnimator, because it just measures how far the camera moved each frame.
+
+The first size and colour were too faint, so I had to check it on screen and change two numbers
+myself. Those numbers (400 points, 3 parsec box, 0.15 parsecs per second) were picked by the AI,
+not measured. The dust also moves when I zoom or pan with the mouse or keyboard, which is
+realistic but not what the spec asked for. A new list of points is made every frame, which works
+for 400 points but would be slow for many more. Real interstellar dust is far too thin to see, so
+this is only a visual effect, not real astronomy.
+
+### Commit
+Add DustField: drifting space dust that streams past when the camera flies
