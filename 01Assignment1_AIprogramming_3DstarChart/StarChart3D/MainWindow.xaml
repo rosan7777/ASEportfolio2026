@@ -58,13 +58,15 @@
         </Border>
 
         <!-- Feature 3: "Nearby stars" panel in the top-right corner, on top of the 3D view.
-             Shows the current star and the 10 stars nearest to it, with distance, bearing and path. -->
+             Shows the current star and the 10 stars nearest to it, with distance, bearing and path.
+             Clicking a star flies the camera to it. The background is almost solid so stars behind
+             the panel don't make the text hard to read. -->
         <Border HorizontalAlignment="Right"
                 VerticalAlignment="Top"
                 Margin="10"
                 Padding="10"
                 Width="330"
-                Background="#B0202020"
+                Background="#F0101010"
                 CornerRadius="4">
             <StackPanel>
                 <TextBlock Text="Nearby stars"
@@ -78,7 +80,8 @@
                 <ListBox x:Name="NearbyStarsList"
                          Background="Transparent"
                          BorderThickness="0"
-                         MaxHeight="520">
+                         MaxHeight="520"
+                         SelectionChanged="NearbyStarsList_SelectionChanged">
                     <ListBox.ItemTemplate>
                         <DataTemplate>
                             <StackPanel Margin="0,2">

@@ -39,6 +39,12 @@ namespace StarChart3D
         private Star? currentStar;
 
         /// <summary>
+        /// The star the camera is flying to after a click in the list. It becomes the current star
+        /// when the flight has finished. Null when no flight to a clicked star is happening.
+        /// </summary>
+        private Star? destinationStar;
+
+        /// <summary>
         /// Creates the window and asks for the stars to be loaded once it has opened.
         /// </summary>
         public MainWindow()
@@ -47,6 +53,7 @@ namespace StarChart3D
             starRenderer = new StarRenderer(StarViewport);
             keyboardCameraController = new KeyboardCameraController(StarViewport);
             cameraAnimator = new CameraAnimator(StarViewport);
+            cameraAnimator.AnimationCompleted += CameraAnimator_AnimationCompleted;
             Loaded += MainWindow_Loaded;
             PreviewKeyDown += MainWindow_PreviewKeyDown;
         }
@@ -127,6 +134,45 @@ namespace StarChart3D
                     CatalogueNames.GetDisplayName(star),
                     Navigation.GetRoute(current, star).ToDisplayString()))
                 .ToList();
+        }
+
+        /// <summary>
+        /// Runs when a star in the "Nearby stars" list is clicked: flies the camera to that star.
+        /// The list is only updated when the flight has finished (see CameraAnimator_AnimationCompleted).
+        /// While the camera is already flying, the click is ignored and the selection is cleared.
+        /// </summary>
+        private void NearbyStarsList_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+        {
+            if (NearbyStarsList.SelectedItem is not NearbyStar clicked)
+            {
+                return; // nothing selected, e.g. after the selection was cleared below
+            }
+
+            if (cameraAnimator.IsAnimating)
+            {
+                NearbyStarsList.SelectedItem = null;
+                return;
+            }
+
+            destinationStar = clicked.Star;
+            Star star = clicked.Star;
+            cameraAnimator.AnimateTo(new Point3D(star.X, star.Y, star.Z), StarViewDistance, FlightSeconds);
+        }
+
+        /// <summary>
+        /// Runs when the camera has finished flying. If it was flying to a star clicked in the list,
+        /// that star becomes the current star and the "Nearby stars" list is filled for it.
+        /// </summary>
+        private void CameraAnimator_AnimationCompleted(object? sender, EventArgs e)
+        {
+            if (destinationStar == null)
+            {
+                return; // the first flight to the Sun: the list was already filled for it
+            }
+
+            currentStar = destinationStar;
+            destinationStar = null;
+            ShowNearbyStars(currentStar);
         }
 
         /// <summary>
