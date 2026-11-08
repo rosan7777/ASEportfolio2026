@@ -213,3 +213,74 @@ consistent. The expert also said it was not sure about the lone m, k, g meaning.
 I did not use the ci and absmag fallback for blank stars, because my Star class does not store
 those columns and only 67 of the 150 blanks have ci. I show them grey as "unknown" instead. The
 expert's C# code also used names like st.Spect and st.Ci that are not in my Star class.
+
+
+
+---
+
+---
+## Entry 3 – 2026-11-07, 23:34 – distance, bearing and path between stars
+### Question
+For my 3D star chart (HYG v4.4, x, y, z in parsecs, Sun at 0,0,0), I need to show the route from
+the current star to another star as: distance in light years, bearing in degrees, and path (the
+up/down angle) in degrees. What do the x, y and z axes point to in HYG, and how should I calculate
+the bearing and the path angle from the two stars' x, y, z? What range should each angle be in
+(for example 0 to 360 for bearing, -90 to +90 for path)?
+
+### Response
+Your assignment brief only says "Lists distance (light years), bearing (degrees) and path
+(degrees)" and doesn't define either angle. So you choose the convention, and you should state it
+in your documentation and AI log.
+
+**What the HYG axes point to.** HYG uses equatorial Cartesian coordinates (epoch J2000), with the
+Sun at the origin:
+
+| Axis | Points toward |
+|---|---|
+| +x | The vernal equinox: RA 0h, Dec 0° (in Pisces) |
+| +y | RA 6h, Dec 0° (in Orion/Monoceros), 90° east of +x along the celestial equator |
+| +z | The north celestial pole: Dec +90°, near Polaris |
+
+x = dist · cos(dec) · cos(ra), y = dist · cos(dec) · sin(ra), z = dist · sin(dec).
+The x–y plane is the celestial equator projected into space. It is not the galactic plane.
+
+**Bearing and path.** Take the vector from the current star A to the target star B:
+dx = xB − xA, dy = yB − yA, dz = zB − zA.
+- Distance: d_pc = √(dx² + dy² + dz²), d_ly = d_pc × 3.26156
+- Bearing: bearing = atan2(dy, dx) in degrees, add 360 if negative. Range 0° to 360°.
+  0° = toward RA 0h, 90° = RA 6h, 180° = RA 12h, 270° = RA 18h.
+- Path: path = atan2(dz, √(dx² + dy²)) in degrees. Range −90° to +90°.
+  +90° is straight "up" toward the north celestial pole, 0° level, −90° straight "down".
+
+Because the axes don't rotate as you travel, the bearing and path are simply the RA (in degrees)
+and Dec of star B as seen from star A. Bearing ÷ 15 gives the RA in hours. Use atan2 rather than
+atan(dy/dx): it handles all four quadrants and won't divide by zero.
+
+**Edge cases**
+- Same star (d = 0): both angles are undefined. Show "—".
+- Target directly above or below (dx = dy = 0): path is ±90°, bearing is meaningless; show "—".
+- dist = 100000 rows: their x, y, z aren't real positions, so exclude them.
+
+**C# sketch.** It gave a `record Route(double DistanceLy, double? BearingDeg, double? PathDeg)` and
+a `ComputeRoute(Star a, Star b)` method using the formulas above, returning null angles for the
+same star and a null bearing when straight up/down. Display as
+"4.37 ly · bearing 219.9° · path −60.8°", one decimal place for angles.
+
+**Quick check:** from the Sun to Alpha Centauri (RA ≈ 14h 39.6m, Dec ≈ −60.8°) this should give
+about 4.37 ly, a bearing of about 219.9° and a path of about −60.8°.
+
+**Watch the axis mapping:** WPF 3D treats Y as up. If you pass HYG coordinates in as (x, z, y) so
+the celestial pole points up on screen, do the route maths on the original HYG x, y, z, not on the
+swapped rendering coordinates.
+
+### How I used it
+I used the expert's bearing and path formulas in Navigation.cs. The test in my app gives Sol to
+Rigil Kentaurus as bearing 219.9° and path -60.8°, exactly what the expert said, so the maths is
+right. I show "—" for the same star, as it suggested.
+
+But its "quick check" distance of 4.37 ly does not match my data. My HYG file says 1.3248 parsecs,
+which is 4.32 ly. 4.37 ly is the number usually quoted for Alpha Centauri, so the expert used a
+general fact instead of my data. The dist = 100000 warning does not affect me because my 2000 stars
+are all within about 20.5 parsecs. I draw the stars with the original x, y, z, so the axis-swap
+warning does not apply, but it is good to know.
+

@@ -626,3 +626,47 @@ fixed numbers I picked without testing other values.
 
 ### Commit
 Add keyboard camera controls: zoom, pan, rotate and reset (KeyboardCameraController)
+
+
+---
+## Entry 18 – 2026-11-07, 23:35 – feature3-3d_movement
+### Prompt
+Context: Feature 3 needs "distance (light years), bearing (degrees) and path (degrees)". I asked
+my domain expert how to calculate them (domain log Entry 3) and sent Claude the expert's full answer.
+
+### Response
+Claude first checked the expert's formulas against my stars.csv: bearing and path match the
+expert's example (Sol to Rigil Kentaurus 219.9°, -60.8°), but the distance in my data is 4.32 ly,
+not the 4.37 ly the expert quoted. It also found that Rigil Kentaurus and Toliman are less than
+0.01 ly apart.
+
+It wrote Navigation.cs (see this commit):
+- record Route(DistanceLightYears, BearingDegrees?, PathDegrees?) with ToDisplayString(), showing
+  "< 0.01 ly" for tiny distances and "—" for missing angles
+- static Navigation.GetRoute(from, to): dx, dy, dz, bearing = atan2(dy, dx) in 0–360,
+  path = atan2(dz, horizontal) in -90 to +90, null angles for the same star or straight up/down
+- MainWindow.xaml.cs: new WriteRouteTest() writes routes from Sol to the Output window
+It first said Sol -> Sol would print "0.00 ly", then corrected itself to "< 0.01 ly".
+
+Result when I ran it:
+```
+Route test:
+  Sol -> Rigil Kentaurus: 4.32 ly, bearing 219.9°, path -60.8°
+  Sol -> Proxima Centauri: 4.23 ly, bearing 217.4°, path -62.7°
+  Sol -> Sirius: 8.60 ly, bearing 101.3°, path -16.7°
+  Sol -> Barnard's Star: 5.95 ly, bearing 269.5°, path 4.7°
+  Sol -> Toliman: 4.32 ly, bearing 219.9°, path -60.8°
+  Sol -> Sol: < 0.01 ly, bearing —, path —
+```
+
+### Critique
+The route maths works and matches my domain expert's example for bearing and path. The AI also
+checked the distance against my real data and found the expert's 4.37 ly was not from my file.
+
+One small flaw: for the same star it shows "< 0.01 ly", when "0 ly" would be more honest. The AI
+also made a mistake in its first explanation (it said "0.00 ly") and then corrected itself. The
+bearing and path use the equatorial axes, so "up" means towards the north celestial pole, which I
+need to explain in the demo because it is not "up" on my screen.
+
+### Commit
+Add Navigation: distance in light years, bearing and path between stars
