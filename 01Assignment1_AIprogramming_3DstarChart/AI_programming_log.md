@@ -885,3 +885,48 @@ I fly freely, so there is no way yet to tell where I am, which the HUD in the ne
 
 ### Commit
 Add ShipController: spaceship flight mode with speed, pitch, turn and roll (F to toggle)
+
+
+## Entry 24 – 2026-11-09, 13:31 – feature4-additional-facilities
+### Prompt
+> Feature 4: add a cockpit HUD (heads-up display) for flight mode. Create a new class FlightHud in
+> the StarChart3D namespace that works out, from the camera, what the HUD shows: the ship's speed
+> in parsecs per second and in light years per second, its heading as a bearing and path in
+> degrees (using the same angles as Navigation, from the direction the camera is looking), the
+> nearest star to the ship with its name and distance in light years, and the distance from the
+> Sun in light years. Show the HUD as a panel at the bottom centre of the window, on top of the 3D
+> view, with a small crosshair in the middle of the screen, only while flight mode is on. Update it
+> while flying. The nearest-star search should use StarCollection, not MainWindow. Don't change
+> StarRenderer, Navigation, CameraAnimator or DustField.
+
+### Response
+Claude wrote FlightHud.cs (see this commit):
+- Read(position, lookDirection, speed) returns a HudReading record with four text lines: speed in
+  pc/s and ly/s, heading (bearing and path), nearest star with distance, and distance from Sol
+- every number comes from Navigation.GetRoute: the ship is made into a pretend Star at the camera
+  position, and the heading is the route to a point 1 parsec ahead in the look direction, so the
+  angles are exactly the same as in the Nearby stars list and no maths is repeated
+StarCollection got GetNearestStar(x, y, z), which checks all stars and returns the closest.
+MainWindow.xaml got a green crosshair in the centre and a green Consolas HUD box at the bottom
+centre, both hidden until flight mode is on and not blocking the mouse. MainWindow.xaml.cs creates
+the FlightHud after loading, shows or hides the HUD when flight mode changes, and updates it every
+frame (CompositionTarget.Rendering) while flying. It could not build or run it.
+
+Result: the HUD and crosshair appear when I press F. Looking straight down -z it showed "bearing
+—, path -90.0°", which is right because the bearing can't be worked out straight down. At
+position about -0.365, -0.262, -0.787 it showed "Nearest star: Proxima Centauri, 1.28 ly" and
+"Distance from Sol: 2.96 ly", and the AI checked both numbers against stars.csv.
+
+### Critique
+It works and the numbers are right. Reusing Navigation.GetRoute with a pretend star was a clever
+way to keep the angles the same everywhere, but making a Star that isn't a real star is a bit of
+a trick; a GetRoute that takes two points would be cleaner, but I said not to change Navigation.
+The HUD text and the Nearby stars panel both show "ly", so they are easy to compare.
+
+The nearest-star search checks all 2000 stars every frame; it is fast enough for 2000 but would
+need a better method for the full HYG catalogue. The file was saved as Flighthud.cs with a small
+h, which I fixed in a separate commit. The light years per second number is far faster than
+light, so the speed is for a game, not realistic.
+
+### Commit
+Add cockpit HUD and crosshair for flight mode: speed, heading, nearest star, distance from Sol (FlightHud)
