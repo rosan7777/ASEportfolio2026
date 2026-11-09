@@ -2,6 +2,7 @@
 using System.IO;
 using System.Windows;
 using System.Windows.Input;
+using System.Windows.Media;
 using System.Windows.Media.Media3D;
 
 namespace StarChart3D
@@ -41,6 +42,12 @@ namespace StarChart3D
         /// <summary>Feature 4: flies the camera like a spaceship when flight mode is on.</summary>
         private readonly ShipController shipController;
 
+        /// <summary>Feature 4: works out what the cockpit HUD shows. Created once the stars are loaded.</summary>
+        private FlightHud? flightHud;
+
+        /// <summary>True while the HUD is listening for screen frames to update itself.</summary>
+        private bool isHudUpdating;
+
         /// <summary>The star the user is currently at. Starts as the Sun.</summary>
         private Star? currentStar;
 
@@ -63,6 +70,7 @@ namespace StarChart3D
             dustField = new DustField(StarViewport);
             shipController = new ShipController(StarViewport);
             shipController.StatusChanged += (sender, e) => ShowFlightStatus();
+            shipController.StatusChanged += (sender, e) => ShowOrHideHud();
             Loaded += MainWindow_Loaded;
             PreviewKeyDown += MainWindow_PreviewKeyDown;
             PreviewKeyUp += MainWindow_PreviewKeyUp;
@@ -95,6 +103,7 @@ namespace StarChart3D
             }
 
             RedrawStars();
+            flightHud = new FlightHud(starCollection);
 
             // Feature 3: start the dust drifting, to give the illusion of slow motion through space.
             dustField.Start();
@@ -249,6 +258,47 @@ namespace StarChart3D
             {
                 shipController.Start();
             }
+        }
+
+        /// <summary>
+        /// Shows the HUD and crosshair while flight mode is on, and hides them when it is off.
+        /// While shown, the HUD is updated once per screen frame (CompositionTarget.Rendering).
+        /// </summary>
+        private void ShowOrHideHud()
+        {
+            bool show = shipController.IsFlightModeOn && flightHud != null;
+
+            HudPanel.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+            Crosshair.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+
+            if (show && !isHudUpdating)
+            {
+                CompositionTarget.Rendering += UpdateHud;
+                isHudUpdating = true;
+                UpdateHud(this, EventArgs.Empty);
+            }
+            else if (!show && isHudUpdating)
+            {
+                CompositionTarget.Rendering -= UpdateHud;
+                isHudUpdating = false;
+            }
+        }
+
+        /// <summary>
+        /// Puts the latest HUD text on screen, from where the camera is, where it looks and the ship's speed.
+        /// </summary>
+        private void UpdateHud(object? sender, EventArgs e)
+        {
+            if (flightHud == null || StarViewport.Camera is not ProjectionCamera camera)
+            {
+                return;
+            }
+
+            HudReading reading = flightHud.Read(camera.Position, camera.LookDirection, shipController.Speed);
+            HudSpeedText.Text = reading.SpeedText;
+            HudHeadingText.Text = reading.HeadingText;
+            HudNearestText.Text = reading.NearestStarText;
+            HudSunText.Text = reading.SunText;
         }
 
         /// <summary>

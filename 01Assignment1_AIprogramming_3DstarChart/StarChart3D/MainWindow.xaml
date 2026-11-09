@@ -105,5 +105,41 @@
                 </ListBox>
             </StackPanel>
         </Border>
+
+        <!-- Feature 4: crosshair in the middle of the screen, shown only in flight mode.
+             IsHitTestVisible="False" lets mouse clicks go through it to the 3D view. -->
+        <Grid x:Name="Crosshair"
+              Width="24"
+              Height="24"
+              HorizontalAlignment="Center"
+              VerticalAlignment="Center"
+              IsHitTestVisible="False"
+              Visibility="Collapsed">
+            <Line X1="0" Y1="12" X2="9" Y2="12" Stroke="#FF7CFC9A" StrokeThickness="1.5" />
+            <Line X1="15" Y1="12" X2="24" Y2="12" Stroke="#FF7CFC9A" StrokeThickness="1.5" />
+            <Line X1="12" Y1="0" X2="12" Y2="9" Stroke="#FF7CFC9A" StrokeThickness="1.5" />
+            <Line X1="12" Y1="15" X2="12" Y2="24" Stroke="#FF7CFC9A" StrokeThickness="1.5" />
+        </Grid>
+
+        <!-- Feature 4: cockpit HUD at the bottom centre, shown only in flight mode.
+             Green monospaced text on an almost solid dark background, like a cockpit display. -->
+        <Border x:Name="HudPanel"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Bottom"
+                Margin="10,10,10,20"
+                Padding="12,8"
+                Background="#F0101010"
+                BorderBrush="#FF7CFC9A"
+                BorderThickness="1"
+                CornerRadius="4"
+                IsHitTestVisible="False"
+                Visibility="Collapsed">
+            <StackPanel>
+                <TextBlock x:Name="HudSpeedText" Foreground="#FF7CFC9A" FontFamily="Consolas" FontSize="14" />
+                <TextBlock x:Name="HudHeadingText" Foreground="#FF7CFC9A" FontFamily="Consolas" FontSize="14" />
+                <TextBlock x:Name="HudNearestText" Foreground="#FF7CFC9A" FontFamily="Consolas" FontSize="14" />
+                <TextBlock x:Name="HudSunText" Foreground="#FF7CFC9A" FontFamily="Consolas" FontSize="14" />
+            </StackPanel>
+        </Border>
     </Grid>
 </Window>
