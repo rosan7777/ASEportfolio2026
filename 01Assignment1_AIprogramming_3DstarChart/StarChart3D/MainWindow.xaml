@@ -48,13 +48,21 @@
                 Padding="8,4"
                 Background="#B0202020"
                 CornerRadius="4">
-            <CheckBox x:Name="ProperNameFilterCheckBox"
-                      Content="Only show stars with a proper name"
-                      Foreground="White"
-                      IsChecked="False"
-                      Focusable="False"
-                      Checked="ProperNameFilterCheckBox_Changed"
-                      Unchecked="ProperNameFilterCheckBox_Changed" />
+            <StackPanel>
+                <CheckBox x:Name="ProperNameFilterCheckBox"
+                          Content="Only show stars with a proper name"
+                          Foreground="White"
+                          IsChecked="False"
+                          Focusable="False"
+                          Checked="ProperNameFilterCheckBox_Changed"
+                          Unchecked="ProperNameFilterCheckBox_Changed" />
+
+                <!-- Feature 4: spaceship flight mode status (F turns it on and off). -->
+                <TextBlock x:Name="FlightStatusText"
+                           Foreground="LightGray"
+                           FontSize="11"
+                           Margin="0,4,0,0" />
+            </StackPanel>
         </Border>
 
         <!-- Feature 3: "Nearby stars" panel in the top-right corner, on top of the 3D view.

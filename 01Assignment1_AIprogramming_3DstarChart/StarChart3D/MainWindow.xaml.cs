@@ -38,6 +38,9 @@ namespace StarChart3D
         /// <summary>Draws the moving space dust that gives the feeling of travelling.</summary>
         private readonly DustField dustField;
 
+        /// <summary>Feature 4: flies the camera like a spaceship when flight mode is on.</summary>
+        private readonly ShipController shipController;
+
         /// <summary>The star the user is currently at. Starts as the Sun.</summary>
         private Star? currentStar;
 
@@ -58,8 +61,13 @@ namespace StarChart3D
             cameraAnimator = new CameraAnimator(StarViewport);
             cameraAnimator.AnimationCompleted += CameraAnimator_AnimationCompleted;
             dustField = new DustField(StarViewport);
+            shipController = new ShipController(StarViewport);
+            shipController.StatusChanged += (sender, e) => ShowFlightStatus();
             Loaded += MainWindow_Loaded;
             PreviewKeyDown += MainWindow_PreviewKeyDown;
+            PreviewKeyUp += MainWindow_PreviewKeyUp;
+            Deactivated += (sender, e) => shipController.ReleaseAllKeys();
+            ShowFlightStatus();
         }
 
         /// <summary>
@@ -161,6 +169,9 @@ namespace StarChart3D
                 return;
             }
 
+            // The ship and the flight to a star would both move the camera, so leave flight mode first.
+            shipController.Stop();
+
             destinationStar = clicked.Star;
             Star star = clicked.Star;
             cameraAnimator.AnimateTo(new Point3D(star.X, star.Y, star.Z), StarViewDistance, FlightSeconds);
@@ -183,15 +194,78 @@ namespace StarChart3D
         }
 
         /// <summary>
-        /// Runs when a key is pressed anywhere in the window. Camera keys are passed to the
-        /// keyboard controller; if it uses the key, the key is marked as handled.
-        /// While the camera is flying, camera keys are ignored so they don't fight the animation.
+        /// Runs when a key is pressed anywhere in the window.
+        /// F turns flight mode on and off (not while the camera is flying to a star).
+        /// In flight mode, ship keys go to the ShipController; otherwise camera keys go to the
+        /// keyboard controller as before. While the camera is flying to a star, camera keys are
+        /// ignored so they don't fight the animation.
         /// </summary>
         private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
         {
+            if (e.Key == Key.F)
+            {
+                ToggleFlightMode();
+                e.Handled = true;
+                return;
+            }
+
+            if (shipController.IsFlightModeOn)
+            {
+                if (shipController.HandleKeyDown(e.Key))
+                {
+                    e.Handled = true;
+                }
+
+                return;
+            }
+
             if (!cameraAnimator.IsAnimating && keyboardCameraController.HandleKey(e.Key))
             {
                 e.Handled = true;
+            }
+        }
+
+        /// <summary>
+        /// Runs when a key is let go anywhere in the window, so the ship knows a key is no longer held.
+        /// </summary>
+        private void MainWindow_PreviewKeyUp(object sender, KeyEventArgs e)
+        {
+            if (shipController.HandleKeyUp(e.Key))
+            {
+                e.Handled = true;
+            }
+        }
+
+        /// <summary>
+        /// Turns flight mode on or off. It can't be turned on while the camera is flying to a star.
+        /// </summary>
+        private void ToggleFlightMode()
+        {
+            if (shipController.IsFlightModeOn)
+            {
+                shipController.Stop();
+            }
+            else if (!cameraAnimator.IsAnimating)
+            {
+                shipController.Start();
+            }
+        }
+
+        /// <summary>
+        /// Shows whether flight mode is on and the ship's speed in the top-left panel, with the ship
+        /// keys as a reminder while flying.
+        /// </summary>
+        private void ShowFlightStatus()
+        {
+            if (shipController.IsFlightModeOn)
+            {
+                FlightStatusText.Text =
+                    $"Flight mode: ON    Speed: {shipController.Speed:0.00} pc/s\n" +
+                    "W/S speed, X stop, arrows pitch/turn, Q/E roll, F exit";
+            }
+            else
+            {
+                FlightStatusText.Text = "Flight mode: OFF (press F to fly)";
             }
         }
 
