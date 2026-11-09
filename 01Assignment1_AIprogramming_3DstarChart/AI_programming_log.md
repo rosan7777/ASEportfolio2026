@@ -973,3 +973,47 @@ if it has a proper name), and Greek letters have to be typed as symbols.
 
 ### Commit
 Add star search: type part of a name, click a match or press Enter to fly there
+
+
+## Entry 26 – 2026-11-09, 13:48 – feature4-additional-facilities
+### Prompt
+> Feature 4: add a spaceship model and a chase view. Create a new class ShipModel in the
+> StarChart3D namespace that builds a simple spaceship 3D model from HelixToolkit shapes (for
+> example a body, wings and a glowing engine), small enough to sit between the stars. Pressing C
+> in flight mode switches between the cockpit view (as now) and a chase view, where the camera sits
+> a short distance behind and above the ship and the ship model is visible in front of it,
+> pointing and moving the way the ship flies. The ship model should only be visible in the chase
+> view. The HUD should keep showing the ship's own position and heading in both views. Don't
+> change StarRenderer, Navigation, CameraAnimator or DustField.
+
+### Response
+Claude wrote ShipModel.cs (see this commit): a body (cylinder) with a nose (cone), two wings and
+a tail fin (boxes), a blue canopy and an orange glowing engine (spheres), about 0.09 parsecs
+long, built once pointing along +X; SetPose moves and turns it with one matrix, and IsVisible
+shows or hides it. It checked that every HelixToolkit method it used exists in version 2.27.3.
+
+It changed ShipController so the ship has its own ShipPosition, ShipForward and ShipUp instead of
+being the camera. Each frame it turns and moves the ship, straightens the directions so rounding
+errors don't build up, then PlaceCamera() puts the camera at the ship (cockpit view) or 0.25 pc
+behind and 0.06 pc above it looking just ahead (chase view), and moves the model. C switches
+views; turning flight mode off puts the camera back at the ship. MainWindow creates the model,
+and the HUD now reads the ship's position and heading, not the camera's. The status line shows
+the view.
+
+Result: in the chase view the ship model is in the middle of the screen with the engine nearest
+to me. The camera was at 0, 0.060, 2.250, exactly 0.25 behind and 0.06 above the ship at 0, 0, 2,
+and the HUD still showed 6.52 ly from Sol, where the ship is.
+
+### Critique
+This makes Feature 4 feel like a real space game, like the Elite example in the brief. Giving the
+ship its own position was a bigger change than I expected, because before the camera was the
+ship, but it was needed for a chase view and it made the HUD correct in both views.
+
+The model is built from simple shapes, so it looks basic. Its size and the chase distances
+(0.25 and 0.06 pc) were picked by the AI and only checked by looking at one screenshot. In flight
+mode, mouse dragging is overwritten every frame because the ship controls the camera. The ship
+is 0.09 pc long, which is about 18,000 times the distance from the Earth to the Sun, so it is
+not to scale.
+
+### Commit
+Add ship model and chase view (C): ship has its own position, camera follows behind
