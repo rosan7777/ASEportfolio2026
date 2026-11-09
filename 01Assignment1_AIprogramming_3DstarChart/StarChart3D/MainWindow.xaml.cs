@@ -71,7 +71,7 @@ namespace StarChart3D
             cameraAnimator = new CameraAnimator(StarViewport);
             cameraAnimator.AnimationCompleted += CameraAnimator_AnimationCompleted;
             dustField = new DustField(StarViewport);
-            shipController = new ShipController(StarViewport);
+            shipController = new ShipController(StarViewport, new ShipModel(StarViewport));
             shipController.StatusChanged += (sender, e) => ShowFlightStatus();
             shipController.StatusChanged += (sender, e) => ShowOrHideHud();
             Loaded += MainWindow_Loaded;
@@ -400,12 +400,13 @@ namespace StarChart3D
         /// </summary>
         private void UpdateHud(object? sender, EventArgs e)
         {
-            if (flightHud == null || StarViewport.Camera is not ProjectionCamera camera)
+            if (flightHud == null)
             {
                 return;
             }
 
-            HudReading reading = flightHud.Read(camera.Position, camera.LookDirection, shipController.Speed);
+            // The ship's own position and heading, not the camera's, so the HUD is the same in both views.
+            HudReading reading = flightHud.Read(shipController.ShipPosition, shipController.ShipForward, shipController.Speed);
             HudSpeedText.Text = reading.SpeedText;
             HudHeadingText.Text = reading.HeadingText;
             HudNearestText.Text = reading.NearestStarText;
@@ -420,9 +421,10 @@ namespace StarChart3D
         {
             if (shipController.IsFlightModeOn)
             {
+                string view = shipController.IsChaseView ? "chase" : "cockpit";
                 FlightStatusText.Text =
-                    $"Flight mode: ON    Speed: {shipController.Speed:0.00} pc/s\n" +
-                    "W/S speed, X stop, arrows pitch/turn, Q/E roll, F exit";
+                    $"Flight mode: ON    View: {view}    Speed: {shipController.Speed:0.00} pc/s\n" +
+                    "W/S speed, X stop, arrows pitch/turn, Q/E roll, C view, F exit";
             }
             else
             {

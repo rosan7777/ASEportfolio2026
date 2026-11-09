@@ -7,12 +7,14 @@ using HelixToolkit.Wpf;
 namespace StarChart3D
 {
     /// <summary>
-    /// Flies the 3D camera like a spaceship (Feature 4, inspired by the game Elite).
-    /// In flight mode the ship keeps moving forward at its current speed, and turns smoothly while a
-    /// key is held:
+    /// Flies a spaceship through the stars (Feature 4, inspired by the game Elite).
+    /// The ship has its own position, forward and up directions. In flight mode it keeps moving
+    /// forward at its current speed, and turns smoothly while a key is held:
     ///   W = speed up, S = slow down (never backwards), X = stop,
     ///   Up / Down arrows = pitch the nose down / up, Left / Right arrows = turn left / right,
-    ///   Q / E = roll left / right.
+    ///   Q / E = roll left / right, C = switch between cockpit view and chase view.
+    /// In the cockpit view the camera is the ship. In the chase view the camera sits behind and
+    /// above the ship, and the ship model is shown.
     /// It uses WPF's own frame timing (CompositionTarget.Rendering), like CameraAnimator, and only
     /// listens for frames while flight mode is on.
     /// </summary>
@@ -30,8 +32,20 @@ namespace StarChart3D
         /// <summary>How fast the ship rolls while Q or E is held, in degrees per second.</summary>
         private const double RollRateDegrees = 60.0;
 
-        /// <summary>The 3D view whose camera is the ship.</summary>
+        /// <summary>In the chase view, how far behind the ship the camera sits, in parsecs.</summary>
+        private const double ChaseDistanceBehind = 0.25;
+
+        /// <summary>In the chase view, how far above the ship the camera sits, in parsecs.</summary>
+        private const double ChaseHeightAbove = 0.06;
+
+        /// <summary>In the chase view, how far in front of the ship the camera looks, in parsecs.</summary>
+        private const double ChaseLookAhead = 0.3;
+
+        /// <summary>The 3D view whose camera follows the ship.</summary>
         private readonly HelixViewport3D viewport;
+
+        /// <summary>The ship model, shown only in the chase view.</summary>
+        private readonly ShipModel shipModel;
 
         /// <summary>The ship keys that are held down right now.</summary>
         private readonly HashSet<Key> heldKeys = new HashSet<Key>();
@@ -40,35 +54,77 @@ namespace StarChart3D
         private readonly Stopwatch frameTimer = new Stopwatch();
 
         /// <summary>
+        /// The camera's look direction length when flight mode started. It is kept in the cockpit view,
+        /// so HelixToolkit's mouse zoom and the camera info still make sense.
+        /// </summary>
+        private double cockpitLookLength = 1.0;
+
+        /// <summary>
         /// Creates the ship controller for the given 3D view. Flight mode starts off.
         /// </summary>
-        /// <param name="viewport">The 3D view whose camera will be flown.</param>
-        public ShipController(HelixViewport3D viewport)
+        /// <param name="viewport">The 3D view whose camera will follow the ship.</param>
+        /// <param name="shipModel">The ship model to show in the chase view.</param>
+        public ShipController(HelixViewport3D viewport, ShipModel shipModel)
         {
             this.viewport = viewport;
+            this.shipModel = shipModel;
         }
 
         /// <summary>Gets a value showing whether flight mode is on.</summary>
         public bool IsFlightModeOn { get; private set; }
 
+        /// <summary>Gets a value showing whether the chase view (camera behind the ship) is on.</summary>
+        public bool IsChaseView { get; private set; }
+
         /// <summary>Gets the ship's current forward speed, in parsecs per second.</summary>
         public double Speed { get; private set; }
 
-        /// <summary>Happens when flight mode is turned on or off, or the speed changes.</summary>
+        /// <summary>Gets where the ship is, in parsecs.</summary>
+        public Point3D ShipPosition { get; private set; }
+
+        /// <summary>Gets the way the ship points (length 1).</summary>
+        public Vector3D ShipForward { get; private set; } = new Vector3D(0, 0, -1);
+
+        /// <summary>Gets the ship's up direction (length 1).</summary>
+        public Vector3D ShipUp { get; private set; } = new Vector3D(0, 1, 0);
+
+        /// <summary>Happens when flight mode or the view is changed, or the speed changes.</summary>
         public event EventHandler? StatusChanged;
 
         /// <summary>
-        /// Turns flight mode on, starting at speed 0, and starts listening for screen frames.
+        /// Turns flight mode on in the cockpit view, starting at speed 0. The ship starts where the
+        /// camera is, pointing the way the camera looks.
         /// </summary>
         public void Start()
         {
-            if (IsFlightModeOn)
+            if (IsFlightModeOn || viewport.Camera is not ProjectionCamera camera)
             {
                 return;
             }
 
+            Vector3D forward = camera.LookDirection;
+            cockpitLookLength = forward.Length > 1e-9 ? forward.Length : 1.0;
+            forward = forward.Length > 1e-9 ? forward : new Vector3D(0, 0, -1);
+            forward.Normalize();
+
+            // Make "up" exactly at right angles to "forward".
+            Vector3D right = Vector3D.CrossProduct(forward, camera.UpDirection);
+            if (right.Length < 1e-9)
+            {
+                right = Vector3D.CrossProduct(forward, new Vector3D(1, 0, 0));
+            }
+
+            right.Normalize();
+            Vector3D up = Vector3D.CrossProduct(right, forward);
+
+            ShipPosition = camera.Position;
+            ShipForward = forward;
+            ShipUp = up;
+
             heldKeys.Clear();
             Speed = 0;
+            IsChaseView = false;
+            shipModel.IsVisible = false;
             frameTimer.Restart();
             CompositionTarget.Rendering += OnRendering;
             IsFlightModeOn = true;
@@ -76,7 +132,8 @@ namespace StarChart3D
         }
 
         /// <summary>
-        /// Turns flight mode off: the ship stops and stops listening for screen frames.
+        /// Turns flight mode off: the ship stops, the camera is put back at the ship (cockpit view),
+        /// the ship model is hidden, and it stops listening for screen frames.
         /// </summary>
         public void Stop()
         {
@@ -89,12 +146,32 @@ namespace StarChart3D
             frameTimer.Stop();
             heldKeys.Clear();
             Speed = 0;
+            IsChaseView = false;
+            shipModel.IsVisible = false;
+            PlaceCamera();
             IsFlightModeOn = false;
             StatusChanged?.Invoke(this, EventArgs.Empty);
         }
 
         /// <summary>
-        /// Called when a key is pressed. Remembers ship keys as held, and X stops the ship at once.
+        /// Switches between the cockpit view and the chase view. Only works in flight mode.
+        /// </summary>
+        public void ToggleView()
+        {
+            if (!IsFlightModeOn)
+            {
+                return;
+            }
+
+            IsChaseView = !IsChaseView;
+            shipModel.IsVisible = IsChaseView;
+            PlaceCamera();
+            StatusChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        /// <summary>
+        /// Called when a key is pressed. Remembers ship keys as held; X stops the ship and C switches
+        /// the view at once.
         /// </summary>
         /// <param name="key">The key that was pressed.</param>
         /// <returns>True if the key is a ship key (so it should not go anywhere else).</returns>
@@ -108,6 +185,12 @@ namespace StarChart3D
             if (key == Key.X)
             {
                 SetSpeed(0);
+                return true;
+            }
+
+            if (key == Key.C)
+            {
+                ToggleView();
                 return true;
             }
 
@@ -132,7 +215,7 @@ namespace StarChart3D
                 return false;
             }
 
-            return heldKeys.Remove(key) || key == Key.X;
+            return heldKeys.Remove(key) || key == Key.X || key == Key.C;
         }
 
         /// <summary>
@@ -143,7 +226,7 @@ namespace StarChart3D
             heldKeys.Clear();
         }
 
-        /// <summary>Returns true for the keys that steer or speed the ship (X is handled on its own).</summary>
+        /// <summary>Returns true for the keys that steer or speed the ship (X and C are handled on their own).</summary>
         private static bool IsShipKey(Key key)
         {
             return key == Key.W || key == Key.S
@@ -153,15 +236,10 @@ namespace StarChart3D
 
         /// <summary>
         /// Runs once per screen frame while flight mode is on: changes the speed and turns the ship
-        /// for the keys that are held, then moves the camera forward.
+        /// for the keys that are held, moves the ship forward, then places the camera and the model.
         /// </summary>
         private void OnRendering(object? sender, EventArgs e)
         {
-            if (viewport.Camera is not ProjectionCamera camera)
-            {
-                return;
-            }
-
             double seconds = frameTimer.Elapsed.TotalSeconds;
             frameTimer.Restart();
 
@@ -176,18 +254,11 @@ namespace StarChart3D
                 SetSpeed(Speed - Acceleration * seconds);
             }
 
-            // The ship's own directions: forward (where the camera looks), up, and right.
-            double lookLength = camera.LookDirection.Length;
-            Vector3D forward = camera.LookDirection;
-            forward.Normalize();
-            Vector3D right = Vector3D.CrossProduct(forward, camera.UpDirection);
-            if (right.Length < 1e-9)
-            {
-                return; // looking straight along the up direction: can't work out "right" this frame
-            }
-
+            // The ship's own directions: forward, up, and right.
+            Vector3D forward = ShipForward;
+            Vector3D up = ShipUp;
+            Vector3D right = Vector3D.CrossProduct(forward, up);
             right.Normalize();
-            Vector3D up = Vector3D.CrossProduct(right, forward);
 
             double turn = TurnRateDegrees * seconds;
             double roll = RollRateDegrees * seconds;
@@ -204,7 +275,7 @@ namespace StarChart3D
                 pitchAngle += turn; // nose up
             }
 
-            // Yaw: turn forward and right around the up axis. A positive angle turns left.
+            // Yaw: turn forward around the up axis. A positive angle turns left.
             double yawAngle = 0;
             if (heldKeys.Contains(Key.Left))
             {
@@ -216,7 +287,7 @@ namespace StarChart3D
                 yawAngle -= turn;
             }
 
-            // Roll: turn up and right around the forward axis. A positive angle rolls right.
+            // Roll: turn up around the forward axis. A positive angle rolls right.
             double rollAngle = 0;
             if (heldKeys.Contains(Key.Q))
             {
@@ -233,13 +304,47 @@ namespace StarChart3D
             forward = Rotate(forward, up, yawAngle);
             up = Rotate(up, forward, rollAngle);
 
+            // Keep both directions length 1 and exactly at right angles, so small rounding errors
+            // don't build up over a long flight.
             forward.Normalize();
-            up.Normalize();
+            right = Vector3D.CrossProduct(forward, up);
+            right.Normalize();
+            up = Vector3D.CrossProduct(right, forward);
 
-            // Keep the look direction's length, so HelixToolkit's mouse zoom and the camera info still make sense.
-            camera.LookDirection = forward * lookLength;
-            camera.UpDirection = up;
-            camera.Position += forward * (Speed * seconds);
+            ShipForward = forward;
+            ShipUp = up;
+            ShipPosition += forward * (Speed * seconds);
+
+            PlaceCamera();
+        }
+
+        /// <summary>
+        /// Puts the camera where the current view needs it, and moves the ship model to the ship.
+        /// Cockpit view: the camera is at the ship, looking forward.
+        /// Chase view: the camera is behind and above the ship, looking at a point just in front of it.
+        /// </summary>
+        private void PlaceCamera()
+        {
+            if (viewport.Camera is not ProjectionCamera camera)
+            {
+                return;
+            }
+
+            if (IsChaseView)
+            {
+                Point3D cameraPosition = ShipPosition - ShipForward * ChaseDistanceBehind + ShipUp * ChaseHeightAbove;
+                Point3D lookAt = ShipPosition + ShipForward * ChaseLookAhead;
+                camera.Position = cameraPosition;
+                camera.LookDirection = lookAt - cameraPosition;
+                camera.UpDirection = ShipUp;
+                shipModel.SetPose(ShipPosition, ShipForward, ShipUp);
+            }
+            else
+            {
+                camera.Position = ShipPosition;
+                camera.LookDirection = ShipForward * cockpitLookLength;
+                camera.UpDirection = ShipUp;
+            }
         }
 
         /// <summary>
