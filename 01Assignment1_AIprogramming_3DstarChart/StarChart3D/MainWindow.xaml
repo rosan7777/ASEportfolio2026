@@ -62,6 +62,44 @@
                            Foreground="LightGray"
                            FontSize="11"
                            Margin="0,4,0,0" />
+
+                <!-- Feature 4: star search. Type part of a name; click a match (or press Enter for the
+                     first one) to fly there. Esc clears the box. -->
+                <TextBlock Text="Search stars:"
+                           Foreground="White"
+                           Margin="0,8,0,2" />
+                <TextBox x:Name="SearchBox"
+                         Width="260"
+                         HorizontalAlignment="Left"
+                         Background="#FF303030"
+                         Foreground="White"
+                         CaretBrush="White"
+                         BorderBrush="Gray"
+                         Padding="2"
+                         TextChanged="SearchBox_TextChanged"
+                         PreviewKeyDown="SearchBox_PreviewKeyDown" />
+                <ListBox x:Name="SearchResultsList"
+                         Width="260"
+                         HorizontalAlignment="Left"
+                         MaxHeight="300"
+                         Margin="0,2,0,0"
+                         Background="#F0101010"
+                         BorderThickness="0"
+                         Visibility="Collapsed"
+                         SelectionChanged="SearchResultsList_SelectionChanged">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel Margin="0,2">
+                                <TextBlock Text="{Binding Name}"
+                                           Foreground="White"
+                                           FontWeight="SemiBold" />
+                                <TextBlock Text="{Binding RouteText}"
+                                           Foreground="LightGray"
+                                           FontSize="11" />
+                            </StackPanel>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
             </StackPanel>
         </Border>
 

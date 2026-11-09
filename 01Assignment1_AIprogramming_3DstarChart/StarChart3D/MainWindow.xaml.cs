@@ -24,6 +24,9 @@ namespace StarChart3D
         /// <summary>How many stars the "Nearby stars" list shows.</summary>
         private const int NearbyStarCount = 10;
 
+        /// <summary>The most matches the star search shows.</summary>
+        private const int SearchResultCount = 8;
+
         /// <summary>All the stars loaded from the data file.</summary>
         private readonly StarCollection starCollection = new StarCollection();
 
@@ -75,6 +78,16 @@ namespace StarChart3D
             PreviewKeyDown += MainWindow_PreviewKeyDown;
             PreviewKeyUp += MainWindow_PreviewKeyUp;
             Deactivated += (sender, e) => shipController.ReleaseAllKeys();
+
+            // Clicking the 3D view takes the keyboard away from the search box, so the ship and
+            // camera keys work again.
+            StarViewport.PreviewMouseDown += (sender, e) =>
+            {
+                if (SearchBox.IsKeyboardFocusWithin)
+                {
+                    MoveKeyboardOffSearchBox();
+                }
+            };
             ShowFlightStatus();
         }
 
@@ -172,18 +185,110 @@ namespace StarChart3D
                 return; // nothing selected, e.g. after the selection was cleared below
             }
 
-            if (cameraAnimator.IsAnimating)
+            if (!FlyToStar(clicked.Star))
             {
                 NearbyStarsList.SelectedItem = null;
-                return;
+            }
+        }
+
+        /// <summary>
+        /// Flies the camera to a star. When the flight ends, the star becomes the current star and the
+        /// "Nearby stars" list updates (see CameraAnimator_AnimationCompleted). Used by the Nearby stars
+        /// list and the star search.
+        /// </summary>
+        /// <param name="star">The star to fly to.</param>
+        /// <returns>False if the camera is already flying, so nothing was started.</returns>
+        private bool FlyToStar(Star star)
+        {
+            if (cameraAnimator.IsAnimating)
+            {
+                return false;
             }
 
             // The ship and the flight to a star would both move the camera, so leave flight mode first.
             shipController.Stop();
 
-            destinationStar = clicked.Star;
-            Star star = clicked.Star;
+            destinationStar = star;
             cameraAnimator.AnimateTo(new Point3D(star.X, star.Y, star.Z), StarViewDistance, FlightSeconds);
+            return true;
+        }
+
+        /// <summary>
+        /// Runs whenever the text in the search box changes: shows up to 8 matching stars under the
+        /// box, each with the route from the current star, or hides the list if there are none.
+        /// </summary>
+        private void SearchBox_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e)
+        {
+            List<Star> matches = starCollection.SearchByName(SearchBox.Text, SearchResultCount);
+
+            SearchResultsList.ItemsSource = matches
+                .Select(star => new NearbyStar(
+                    star,
+                    CatalogueNames.GetDisplayName(star),
+                    currentStar == null ? string.Empty : Navigation.GetRoute(currentStar, star).ToDisplayString()))
+                .ToList();
+
+            SearchResultsList.Visibility = matches.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        /// <summary>
+        /// Enter in the search box flies to the first match; Esc clears the box and gives the keyboard
+        /// back to the ship and camera keys.
+        /// </summary>
+        private void SearchBox_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Enter && SearchResultsList.Items.Count > 0)
+            {
+                SearchResultsList.SelectedIndex = 0; // the same as clicking the first match
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Escape)
+            {
+                ClearSearch();
+                e.Handled = true;
+            }
+        }
+
+        /// <summary>
+        /// Runs when a match in the search list is clicked: flies to that star, then clears the search.
+        /// </summary>
+        private void SearchResultsList_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+        {
+            if (SearchResultsList.SelectedItem is not NearbyStar clicked)
+            {
+                return;
+            }
+
+            if (FlyToStar(clicked.Star))
+            {
+                ClearSearch();
+            }
+            else
+            {
+                SearchResultsList.SelectedItem = null; // the camera is already flying: ignore the click
+            }
+        }
+
+        /// <summary>
+        /// Empties the search box, hides the matches and moves the keyboard back to the window.
+        /// </summary>
+        private void ClearSearch()
+        {
+            SearchBox.Text = string.Empty; // this also hides the list, through SearchBox_TextChanged
+            MoveKeyboardOffSearchBox();
+        }
+
+        /// <summary>
+        /// Takes the keyboard away from the search box and gives it to the window, so the ship and
+        /// camera keys work again. If the window can't take it, the keyboard focus is just cleared.
+        /// </summary>
+        private void MoveKeyboardOffSearchBox()
+        {
+            Keyboard.Focus(this);
+            if (SearchBox.IsKeyboardFocusWithin)
+            {
+                Keyboard.ClearFocus();
+            }
         }
 
         /// <summary>
@@ -203,7 +308,7 @@ namespace StarChart3D
         }
 
         /// <summary>
-        /// Runs when a key is pressed anywhere in the window.
+        /// Runs when a key is pressed anywhere in the window. Keys typed into the search box are left alone.
         /// F turns flight mode on and off (not while the camera is flying to a star).
         /// In flight mode, ship keys go to the ShipController; otherwise camera keys go to the
         /// keyboard controller as before. While the camera is flying to a star, camera keys are
@@ -211,6 +316,12 @@ namespace StarChart3D
         /// </summary>
         private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
         {
+            // While typing in the search box, every key goes into the box, not to the ship or camera.
+            if (SearchBox.IsKeyboardFocusWithin)
+            {
+                return;
+            }
+
             if (e.Key == Key.F)
             {
                 ToggleFlightMode();

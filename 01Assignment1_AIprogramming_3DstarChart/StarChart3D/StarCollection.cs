@@ -105,6 +105,32 @@ namespace StarChart3D
         }
 
         /// <summary>
+        /// Finds stars whose display name (from CatalogueNames) contains the search text, ignoring
+        /// upper and lower case (Feature 4). Names that start with the text come first, then the
+        /// rest; within each group the stars closest to the Sun come first.
+        /// </summary>
+        /// <param name="text">Part of a star name, for example "sir".</param>
+        /// <param name="maxResults">The most stars to return.</param>
+        /// <returns>Up to maxResults matching stars. Empty if the text is blank.</returns>
+        public List<Star> SearchByName(string text, int maxResults)
+        {
+            string search = text.Trim();
+            if (search.Length == 0)
+            {
+                return new List<Star>();
+            }
+
+            return stars
+                .Select(star => new { Star = star, Name = CatalogueNames.GetDisplayName(star) })
+                .Where(match => match.Name.Contains(search, StringComparison.OrdinalIgnoreCase))
+                .OrderBy(match => match.Name.StartsWith(search, StringComparison.OrdinalIgnoreCase) ? 0 : 1)
+                .ThenBy(match => match.Star.Distance)
+                .Take(maxResults)
+                .Select(match => match.Star)
+                .ToList();
+        }
+
+        /// <summary>
         /// Returns the star nearest to a point in space, for example where the ship is (Feature 4).
         /// </summary>
         /// <param name="x">The point's x, in parsecs.</param>
