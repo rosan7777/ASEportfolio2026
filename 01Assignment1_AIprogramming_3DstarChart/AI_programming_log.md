@@ -930,3 +930,46 @@ light, so the speed is for a game, not realistic.
 
 ### Commit
 Add cockpit HUD and crosshair for flight mode: speed, heading, nearest star, distance from Sol (FlightHud)
+
+
+## Entry 25 – 2026-11-09, 13:41 – feature4-additional-facilities
+### Prompt
+> Feature 4: add a star search. Put a search box in the top-left panel under the flight status.
+> When I type part of a star's name (for example "sir"), show a short list of up to 8 matching
+> stars under the box, using the same display names as CatalogueNames and ignoring upper/lower
+> case. Clicking a match flies the camera to that star with CameraAnimator, the same way as
+> clicking a star in the Nearby stars list, so that star becomes the current star and the Nearby
+> list updates. Put the search code in StarCollection, not MainWindow. While I am typing in the
+> box, letters like F, W, S, X, Q and E must go into the box and must not control the ship or the
+> camera. Don't change StarRenderer, Navigation, CameraAnimator or DustField.
+
+### Response
+Claude added (see this commit):
+- StarCollection.SearchByName(text, maxResults): matches the CatalogueNames display name,
+  ignoring case; names that start with the text come first, then the rest, closest to the Sun
+  first, up to 8
+- MainWindow.xaml: a "Search stars:" label, a text box and a results list (hidden when there are
+  no matches) in the top-left panel; each match shows the route from the current star
+- MainWindow.xaml.cs: the list updates as I type; clicking a match or pressing Enter flies to it
+  and clears the box; Esc clears the box; while the box has the keyboard, the window's key handler
+  does nothing, so letters go into the box; clicking the 3D view takes the keyboard back
+- it moved the "fly to a star" code into one FlyToStar() method that both the Nearby list and the
+  search use, so they behave the same
+It warned that names with Greek letters are shown as symbols, so "tau" won't find τ Cet.
+
+Result: typing "sir" showed Sirius and clicking it flew there, and the Nearby panel changed to
+"Current star: Sirius". Typing letters like F and W went into the box without turning on flight
+mode.
+
+### Critique
+The search makes the chart much easier to use, because I can go to any of the 2000 stars without
+finding it on screen first. Moving the flight code into FlyToStar() removed repeated code, so the
+two lists can't behave differently.
+
+It works out the display name of every star each time I type a letter, which is fine for 2000
+stars but wasteful; the names could be worked out once after loading. Searching only matches the
+display name, so a star can't be found by its other catalogue names (for example its HIP number
+if it has a proper name), and Greek letters have to be typed as symbols.
+
+### Commit
+Add star search: type part of a name, click a match or press Enter to fly there
