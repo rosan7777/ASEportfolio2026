@@ -835,3 +835,53 @@ this is only a visual effect, not real astronomy.
 
 ### Commit
 Add DustField: drifting space dust that streams past when the camera flies
+
+
+
+## Entry 23 – 2026-11-09, 13:18 – feature4-additional-facilities
+### Prompt
+> Feature 4: add a spaceship flight mode, like the game Elite. Create a new class ShipController
+> in the StarChart3D namespace that flies the 3D camera like a spaceship, using WPF's own frame
+> timing like CameraAnimator. Pressing F turns flight mode on and off. In flight mode: W speeds up,
+> S slows down (it can't go backwards), X stops the ship, the up and down arrows pitch the nose
+> down and up, the left and right arrows turn left and right, and Q and E roll left and right. The
+> ship keeps moving forward at its current speed until it is slowed down. Turning should be smooth
+> while a key is held, not in steps. While flight mode is on, these keys should go to the ship and
+> not to KeyboardCameraController; when it is off, everything works as before. Flight mode can't
+> be turned on while CameraAnimator is flying to a star. Show "Flight mode: ON" or "OFF" and the
+> current speed in parsecs per second somewhere small on screen for now. Don't change
+> StarRenderer, Navigation, CameraAnimator or DustField.
+
+### Response
+Claude wrote ShipController.cs (see this commit):
+- Start() and Stop() turn flight mode on and off; the ship starts and ends at speed 0
+- HandleKeyDown and HandleKeyUp remember which ship keys are held, so turning is smooth; X stops
+  the ship at once
+- every frame (CompositionTarget.Rendering with a Stopwatch): W and S change the speed by 1 pc/s
+  each second, kept between 0 and 5 pc/s; the arrows pitch and turn at 45° per second and Q/E roll
+  at 60° per second, by rotating the camera's look and up directions around the ship's own axes
+  (right, up and forward) with a Quaternion; then the camera moves forward at the current speed
+- a StatusChanged event when the mode or the speed changes
+In MainWindow: F toggles flight mode (not while flying to a star), ship keys go to the ship in
+flight mode and to KeyboardCameraController otherwise, a PreviewKeyUp handler, held keys are
+released when the window loses focus, and a status line under the checkbox. It also turns flight
+mode off when a star in the Nearby list is clicked, because both would move the camera; I didn't
+ask for that, but it makes sense. It checked the turning directions with a small maths test but
+could not build or run it.
+
+Result: pressing F shows "Flight mode: ON  Speed: 0.00 pc/s" and the list of ship keys, and I
+could fly the camera away from the Sun with the ship keys.
+
+### Critique
+This is the start of the big Feature 4 idea from the brief (flying like Elite). The ship code is
+in its own class, and MainWindow only decides where keys go. Holding keys gives smooth turning
+instead of the 5° steps of KeyboardCameraController, and the dust from Feature 3 now makes
+flying feel like real movement.
+
+The speeds and turn rates (5 pc/s, 45°, 60°) were picked by the AI, not tested against other
+values. The real speed of light is far slower than this (1 pc is about 3.26 light years), so this
+is a game speed, not a realistic one. The "Current star" in the Nearby panel doesn't change while
+I fly freely, so there is no way yet to tell where I am, which the HUD in the next step will fix.
+
+### Commit
+Add ShipController: spaceship flight mode with speed, pitch, turn and roll (F to toggle)
