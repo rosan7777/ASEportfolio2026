@@ -9,7 +9,8 @@ namespace StarChart3D
     /// <param name="HeadingText">The bearing and path of the direction the ship is pointing.</param>
     /// <param name="NearestStarText">The nearest star to the ship and how far away it is.</param>
     /// <param name="SunText">How far the ship is from the Sun.</param>
-    public record HudReading(string SpeedText, string HeadingText, string NearestStarText, string SunText);
+    /// <param name="TargetText">The target star, its distance, how far off the nose it is, and the autopilot.</param>
+    public record HudReading(string SpeedText, string HeadingText, string NearestStarText, string SunText, string TargetText);
 
     /// <summary>
     /// Works out what the cockpit HUD shows in flight mode (Feature 4), from the camera and the ship's
@@ -47,8 +48,11 @@ namespace StarChart3D
         /// <param name="shipPosition">The camera position, in parsecs.</param>
         /// <param name="lookDirection">The direction the camera is looking.</param>
         /// <param name="speedParsecsPerSecond">The ship's speed from ShipController.</param>
+        /// <param name="target">The ship's target star, or null if there is none.</param>
+        /// <param name="isAutopilotOn">True if the autopilot is flying to the target.</param>
         /// <returns>The text for each HUD line.</returns>
-        public HudReading Read(Point3D shipPosition, Vector3D lookDirection, double speedParsecsPerSecond)
+        public HudReading Read(Point3D shipPosition, Vector3D lookDirection, double speedParsecsPerSecond,
+                               Star? target, bool isAutopilotOn)
         {
             // The ship as a pretend star, so Navigation.GetRoute can be reused for every number.
             Star ship = MakePoint(shipPosition);
@@ -86,7 +90,26 @@ namespace StarChart3D
                 ? "Distance from Sol: unknown"
                 : $"Distance from Sol: {FormatDistance(Navigation.GetRoute(ship, sun).DistanceLightYears)}";
 
-            return new HudReading(speedText, headingText, nearestText, sunText);
+            string targetText;
+            if (target == null)
+            {
+                targetText = "Target: none (choose a star in a list)";
+            }
+            else
+            {
+                Route toTarget = Navigation.GetRoute(ship, target);
+
+                // How far off the nose: the angle between where the ship points and the direction to the target.
+                Vector3D direction = new Point3D(target.X, target.Y, target.Z) - shipPosition;
+                string offNose = direction.Length < 1e-9 || lookDirection.Length < 1e-9
+                    ? "—"
+                    : $"{Vector3D.AngleBetween(lookDirection, direction):0.0}°";
+
+                string autopilot = isAutopilotOn ? "AUTOPILOT ON" : "T = autopilot";
+                targetText = $"Target: {CatalogueNames.GetDisplayName(target)}, {FormatDistance(toTarget.DistanceLightYears)}, {offNose} off nose  [{autopilot}]";
+            }
+
+            return new HudReading(speedText, headingText, nearestText, sunText, targetText);
         }
 
         /// <summary>Makes a pretend star at a point, only so its X, Y, Z can be passed to Navigation.</summary>

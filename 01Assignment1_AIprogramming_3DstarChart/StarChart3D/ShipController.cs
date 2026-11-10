@@ -12,7 +12,8 @@ namespace StarChart3D
     /// forward at its current speed, and turns smoothly while a key is held:
     ///   W = speed up, S = slow down (never backwards), X = stop,
     ///   Up / Down arrows = pitch the nose down / up, Left / Right arrows = turn left / right,
-    ///   Q / E = roll left / right, C = switch between cockpit view and chase view.
+    ///   Q / E = roll left / right, C = switch between cockpit view and chase view,
+    ///   T = autopilot on/off (flies to the target star; any steering key turns it off).
     /// In the cockpit view the camera is the ship. In the chase view the camera sits behind and
     /// above the ship, and the ship model is shown.
     /// It uses WPF's own frame timing (CompositionTarget.Rendering), like CameraAnimator, and only
@@ -40,6 +41,21 @@ namespace StarChart3D
 
         /// <summary>In the chase view, how far in front of the ship the camera looks, in parsecs.</summary>
         private const double ChaseLookAhead = 0.3;
+
+        /// <summary>The autopilot stops the ship this close to the target star, in parsecs (about 1 light year).</summary>
+        private const double ArrivalDistance = 0.3;
+
+        /// <summary>The slowest the autopilot flies before arriving, in parsecs per second, so it never stalls.</summary>
+        private const double AutopilotMinSpeed = 0.05;
+
+        /// <summary>
+        /// If the target is more than this many degrees off the nose, the autopilot flies slowly while it
+        /// turns, so it doesn't fly a wide circle.
+        /// </summary>
+        private const double AutopilotSlowTurnAngle = 45.0;
+
+        /// <summary>The autopilot's speed while it is turning towards a target far off the nose, in parsecs per second.</summary>
+        private const double AutopilotTurningSpeed = 0.3;
 
         /// <summary>The 3D view whose camera follows the ship.</summary>
         private readonly HelixViewport3D viewport;
@@ -88,8 +104,51 @@ namespace StarChart3D
         /// <summary>Gets the ship's up direction (length 1).</summary>
         public Vector3D ShipUp { get; private set; } = new Vector3D(0, 1, 0);
 
-        /// <summary>Happens when flight mode or the view is changed, or the speed changes.</summary>
+        /// <summary>Gets the star the ship is targeting, or null if there is no target.</summary>
+        public Star? Target { get; private set; }
+
+        /// <summary>Gets a value showing whether the autopilot is flying the ship to the target.</summary>
+        public bool IsAutopilotOn { get; private set; }
+
+        /// <summary>Happens when flight mode, the view, the target or the autopilot is changed, or the speed changes.</summary>
         public event EventHandler? StatusChanged;
+
+        /// <summary>Happens when the autopilot has stopped the ship near the target. The sender is this controller.</summary>
+        public event EventHandler<Star>? AutopilotArrived;
+
+        /// <summary>
+        /// Sets the star the ship targets (or null for none). The autopilot keeps flying if it is on,
+        /// now towards the new target.
+        /// </summary>
+        /// <param name="star">The new target star.</param>
+        public void SetTarget(Star? star)
+        {
+            Target = star;
+            if (star == null)
+            {
+                IsAutopilotOn = false;
+            }
+
+            StatusChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        /// <summary>
+        /// Turns the autopilot on or off. It can only be turned on in flight mode with a target.
+        /// </summary>
+        public void ToggleAutopilot()
+        {
+            if (IsAutopilotOn)
+            {
+                IsAutopilotOn = false;
+            }
+            else if (IsFlightModeOn && Target != null)
+            {
+                IsAutopilotOn = true;
+                heldKeys.Clear(); // the autopilot is flying now, not the keys
+            }
+
+            StatusChanged?.Invoke(this, EventArgs.Empty);
+        }
 
         /// <summary>
         /// Turns flight mode on in the cockpit view, starting at speed 0. The ship starts where the
@@ -123,6 +182,8 @@ namespace StarChart3D
 
             heldKeys.Clear();
             Speed = 0;
+            Target = null;
+            IsAutopilotOn = false;
             IsChaseView = false;
             shipModel.IsVisible = false;
             frameTimer.Restart();
@@ -146,6 +207,8 @@ namespace StarChart3D
             frameTimer.Stop();
             heldKeys.Clear();
             Speed = 0;
+            Target = null;
+            IsAutopilotOn = false;
             IsChaseView = false;
             shipModel.IsVisible = false;
             PlaceCamera();
@@ -182,6 +245,19 @@ namespace StarChart3D
                 return false;
             }
 
+            if (key == Key.T)
+            {
+                ToggleAutopilot();
+                return true;
+            }
+
+            // Any steering or speed key takes control back from the autopilot.
+            if (IsAutopilotOn && (key == Key.X || IsShipKey(key)))
+            {
+                IsAutopilotOn = false;
+                StatusChanged?.Invoke(this, EventArgs.Empty);
+            }
+
             if (key == Key.X)
             {
                 SetSpeed(0);
@@ -215,7 +291,7 @@ namespace StarChart3D
                 return false;
             }
 
-            return heldKeys.Remove(key) || key == Key.X || key == Key.C;
+            return heldKeys.Remove(key) || key == Key.X || key == Key.C || key == Key.T;
         }
 
         /// <summary>
@@ -226,7 +302,7 @@ namespace StarChart3D
             heldKeys.Clear();
         }
 
-        /// <summary>Returns true for the keys that steer or speed the ship (X and C are handled on their own).</summary>
+        /// <summary>Returns true for the keys that steer or speed the ship (X, C and T are handled on their own).</summary>
         private static bool IsShipKey(Key key)
         {
             return key == Key.W || key == Key.S
@@ -242,6 +318,13 @@ namespace StarChart3D
         {
             double seconds = frameTimer.Elapsed.TotalSeconds;
             frameTimer.Restart();
+
+            if (IsAutopilotOn)
+            {
+                FlyAutopilot(seconds);
+                PlaceCamera();
+                return;
+            }
 
             // Speed: W and S change it smoothly while held.
             if (heldKeys.Contains(Key.W))
@@ -316,6 +399,85 @@ namespace StarChart3D
             ShipPosition += forward * (Speed * seconds);
 
             PlaceCamera();
+        }
+
+        /// <summary>
+        /// One frame of the autopilot: turns the ship towards the target at the normal turn rate,
+        /// changes the speed smoothly (no faster than W and S would), and stops near the target.
+        /// The speed is limited so the ship can always brake in time: v = sqrt(2 × acceleration × distance left).
+        /// </summary>
+        /// <param name="seconds">The time since the last frame.</param>
+        private void FlyAutopilot(double seconds)
+        {
+            if (Target == null)
+            {
+                IsAutopilotOn = false;
+                StatusChanged?.Invoke(this, EventArgs.Empty);
+                return;
+            }
+
+            Star target = Target;
+            Vector3D toTarget = new Point3D(target.X, target.Y, target.Z) - ShipPosition;
+            double distance = toTarget.Length;
+
+            // Arrived: stop, turn the autopilot off and tell the window. The small extra allows for
+            // rounding errors, because the last step stops the ship exactly at ArrivalDistance.
+            if (distance <= ArrivalDistance + 1e-6)
+            {
+                SetSpeed(0);
+                IsAutopilotOn = false;
+                StatusChanged?.Invoke(this, EventArgs.Empty);
+                AutopilotArrived?.Invoke(this, target);
+                return;
+            }
+
+            // Turn: rotate forward and up around the axis at right angles to both "forward" and
+            // "towards the target", by no more than the normal turn rate this frame.
+            Vector3D forward = ShipForward;
+            Vector3D up = ShipUp;
+            double angleOff = Vector3D.AngleBetween(forward, toTarget); // degrees, 0 to 180
+            double maxTurn = TurnRateDegrees * seconds;
+            if (angleOff > 1e-6)
+            {
+                Vector3D axis = Vector3D.CrossProduct(forward, toTarget);
+                if (axis.Length < 1e-9)
+                {
+                    axis = up; // the target is straight behind: turn around the up axis
+                }
+
+                double turn = Math.Min(angleOff, maxTurn);
+                forward = Rotate(forward, axis, turn);
+                up = Rotate(up, axis, turn);
+            }
+
+            // Keep both directions length 1 and exactly at right angles.
+            forward.Normalize();
+            Vector3D right = Vector3D.CrossProduct(forward, up);
+            right.Normalize();
+            up = Vector3D.CrossProduct(right, forward);
+            ShipForward = forward;
+            ShipUp = up;
+
+            // Speed: as fast as allowed, but able to brake before arriving, and slow while turning a lot.
+            double distanceLeft = distance - ArrivalDistance;
+            double wantedSpeed = Math.Min(MaxSpeed, Math.Sqrt(2 * Acceleration * distanceLeft));
+            wantedSpeed = Math.Max(wantedSpeed, AutopilotMinSpeed);
+            double angleAfterTurn = Vector3D.AngleBetween(forward, toTarget);
+            if (angleAfterTurn > 90.0)
+            {
+                wantedSpeed = AutopilotMinSpeed; // target is behind: nearly stop and turn on the spot
+            }
+            else if (angleAfterTurn > AutopilotSlowTurnAngle)
+            {
+                wantedSpeed = Math.Min(wantedSpeed, AutopilotTurningSpeed);
+            }
+
+            double maxChange = Acceleration * seconds;
+            SetSpeed(Speed + Math.Clamp(wantedSpeed - Speed, -maxChange, maxChange));
+
+            // Don't fly past the stopping point in one frame.
+            double step = Math.Min(Speed * seconds, distanceLeft);
+            ShipPosition += forward * step;
         }
 
         /// <summary>

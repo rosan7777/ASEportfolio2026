@@ -74,6 +74,7 @@ namespace StarChart3D
             shipController = new ShipController(StarViewport, new ShipModel(StarViewport));
             shipController.StatusChanged += (sender, e) => ShowFlightStatus();
             shipController.StatusChanged += (sender, e) => ShowOrHideHud();
+            shipController.AutopilotArrived += ShipController_AutopilotArrived;
             Loaded += MainWindow_Loaded;
             PreviewKeyDown += MainWindow_PreviewKeyDown;
             PreviewKeyUp += MainWindow_PreviewKeyUp;
@@ -174,8 +175,8 @@ namespace StarChart3D
         }
 
         /// <summary>
-        /// Runs when a star in the "Nearby stars" list is clicked: flies the camera to that star.
-        /// The list is only updated when the flight has finished (see CameraAnimator_AnimationCompleted).
+        /// Runs when a star in the "Nearby stars" list is clicked: flies the camera to that star, or in
+        /// flight mode makes it the ship's target (see ChooseStar).
         /// While the camera is already flying, the click is ignored and the selection is cleared.
         /// </summary>
         private void NearbyStarsList_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
@@ -185,10 +186,38 @@ namespace StarChart3D
                 return; // nothing selected, e.g. after the selection was cleared below
             }
 
-            if (!FlyToStar(clicked.Star))
+            if (!ChooseStar(clicked.Star))
             {
                 NearbyStarsList.SelectedItem = null;
             }
+        }
+
+        /// <summary>
+        /// Called when a star is chosen in the Nearby stars list or the search.
+        /// In flight mode the star becomes the ship's target (press T for the autopilot);
+        /// otherwise the camera flies there as before.
+        /// </summary>
+        /// <param name="star">The chosen star.</param>
+        /// <returns>False if nothing happened because the camera is already flying to a star.</returns>
+        private bool ChooseStar(Star star)
+        {
+            if (shipController.IsFlightModeOn)
+            {
+                shipController.SetTarget(star);
+                return true;
+            }
+
+            return FlyToStar(star);
+        }
+
+        /// <summary>
+        /// Runs when the autopilot has stopped the ship near its target: that star becomes the current
+        /// star and the "Nearby stars" list is filled for it. The ship stays in flight mode.
+        /// </summary>
+        private void ShipController_AutopilotArrived(object? sender, Star target)
+        {
+            currentStar = target;
+            ShowNearbyStars(target);
         }
 
         /// <summary>
@@ -250,7 +279,8 @@ namespace StarChart3D
         }
 
         /// <summary>
-        /// Runs when a match in the search list is clicked: flies to that star, then clears the search.
+        /// Runs when a match in the search list is clicked: flies to that star (or makes it the ship's
+        /// target in flight mode), then clears the search.
         /// </summary>
         private void SearchResultsList_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
         {
@@ -259,7 +289,7 @@ namespace StarChart3D
                 return;
             }
 
-            if (FlyToStar(clicked.Star))
+            if (ChooseStar(clicked.Star))
             {
                 ClearSearch();
             }
@@ -406,11 +436,13 @@ namespace StarChart3D
             }
 
             // The ship's own position and heading, not the camera's, so the HUD is the same in both views.
-            HudReading reading = flightHud.Read(shipController.ShipPosition, shipController.ShipForward, shipController.Speed);
+            HudReading reading = flightHud.Read(shipController.ShipPosition, shipController.ShipForward, shipController.Speed,
+                                                shipController.Target, shipController.IsAutopilotOn);
             HudSpeedText.Text = reading.SpeedText;
             HudHeadingText.Text = reading.HeadingText;
             HudNearestText.Text = reading.NearestStarText;
             HudSunText.Text = reading.SunText;
+            HudTargetText.Text = reading.TargetText;
         }
 
         /// <summary>
@@ -424,7 +456,7 @@ namespace StarChart3D
                 string view = shipController.IsChaseView ? "chase" : "cockpit";
                 FlightStatusText.Text =
                     $"Flight mode: ON    View: {view}    Speed: {shipController.Speed:0.00} pc/s\n" +
-                    "W/S speed, X stop, arrows pitch/turn, Q/E roll, C view, F exit";
+                    "W/S speed, X stop, arrows pitch/turn, Q/E roll, C view, T autopilot, F exit";
             }
             else
             {
