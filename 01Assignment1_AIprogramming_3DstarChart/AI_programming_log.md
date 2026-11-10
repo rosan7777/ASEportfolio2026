@@ -1017,3 +1017,54 @@ not to scale.
 
 ### Commit
 Add ship model and chase view (C): ship has its own position, camera follows behind
+
+
+## Entry 27 – 2026-11-10, 02:06 – feature4-additional-facilities
+### Prompt
+> Feature 4: add a target lock and autopilot to flight mode. In flight mode, choosing a star in the
+> search box or the Nearby stars list should not fly there with CameraAnimator; instead it should
+> become the ship's target and the ship stays in flight mode. Add the target to the HUD: its name,
+> distance in light years, and how far off the nose it is (the angle in degrees between where the
+> ship points and the direction to the target). Pressing T turns the autopilot on and off: when it
+> is on, the ship turns smoothly towards the target at its normal turn rate, speeds up, slows down
+> as it gets close, and stops near the target, then the autopilot turns itself off and the target
+> becomes the current star in the Nearby list. Any steering key pressed while the autopilot is on
+> turns it off. Outside flight mode, choosing a star should still fly there as before. Don't
+> change StarRenderer, Navigation, CameraAnimator or DustField.
+
+### Response
+Claude changed four files:
+- ShipController: a Target star, IsAutopilotOn, SetTarget, ToggleAutopilot (T) and an
+  AutopilotArrived event. Each frame FlyAutopilot turns the ship towards the target at 45° per
+  second, changes speed no faster than W and S would, limits the speed to
+  sqrt(2 × acceleration × distance left) so it can always brake in time, flies slowly while the
+  target is far off the nose, and stops 0.3 pc (about 1 ly) from the star. Any steering or speed
+  key turns the autopilot off.
+- FlightHud: a fifth line with the target name, distance (from Navigation.GetRoute), the angle
+  off the nose (Vector3D.AngleBetween) and the autopilot state.
+- MainWindow.xaml: the target line in yellow so it stands out.
+- MainWindow.xaml.cs: ChooseStar() makes a chosen star the target in flight mode and still flies
+  there with CameraAnimator outside flight mode; when the autopilot arrives, that star becomes the
+  current star and the Nearby list updates.
+Before giving me the code it tested the steering in a simulation. This found a real bug: the last
+step stopped the ship exactly at the arrival distance, and a rounding error meant it never counted
+as "arrived". It fixed this with a tiny tolerance, and then the simulation reached every target,
+including a star behind the ship and 200 random stars from stars.csv.
+
+Result: in flight mode clicking a star made it the target and the yellow HUD line showed its
+distance and angle off the nose. Pressing T flew the ship there; it slowed down, stopped near the
+star, the autopilot switched off and the Nearby panel changed to the new current star.
+
+### Critique
+This ties Feature 4 together: search, the Nearby list, the HUD, the ship and the chase view all
+work with the autopilot. The braking formula sqrt(2 × acceleration × distance) is real physics
+for stopping in time, not a guess. Testing the steering before I ran it found a bug that would
+have made the autopilot never finish, which I might have missed.
+
+The autopilot flies in a straight line and does not avoid other stars on the way. The arrival
+distance (0.3 pc) and the slow-turning rules (45° and 90°) were picked by the AI. Choosing a star
+now does different things in and out of flight mode, which could confuse a new user, so the
+status line and HUD have to explain it.
+
+### Commit
+Add target lock and autopilot (T): choose a star in flight mode, HUD shows target, ship flies there and stops
