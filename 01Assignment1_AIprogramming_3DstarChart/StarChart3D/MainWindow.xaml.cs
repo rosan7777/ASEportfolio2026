@@ -2,6 +2,7 @@
 using System.IO;
 using System.Windows;
 using System.Windows.Input;
+using System.Windows.Media;
 using System.Windows.Media.Media3D;
 
 namespace StarChart3D
@@ -23,6 +24,9 @@ namespace StarChart3D
         /// <summary>How many stars the "Nearby stars" list shows.</summary>
         private const int NearbyStarCount = 10;
 
+        /// <summary>The most matches the star search shows.</summary>
+        private const int SearchResultCount = 8;
+
         /// <summary>All the stars loaded from the data file.</summary>
         private readonly StarCollection starCollection = new StarCollection();
 
@@ -37,6 +41,15 @@ namespace StarChart3D
 
         /// <summary>Draws the moving space dust that gives the feeling of travelling.</summary>
         private readonly DustField dustField;
+
+        /// <summary>Feature 4: flies the camera like a spaceship when flight mode is on.</summary>
+        private readonly ShipController shipController;
+
+        /// <summary>Feature 4: works out what the cockpit HUD shows. Created once the stars are loaded.</summary>
+        private FlightHud? flightHud;
+
+        /// <summary>True while the HUD is listening for screen frames to update itself.</summary>
+        private bool isHudUpdating;
 
         /// <summary>The star the user is currently at. Starts as the Sun.</summary>
         private Star? currentStar;
@@ -58,8 +71,25 @@ namespace StarChart3D
             cameraAnimator = new CameraAnimator(StarViewport);
             cameraAnimator.AnimationCompleted += CameraAnimator_AnimationCompleted;
             dustField = new DustField(StarViewport);
+            shipController = new ShipController(StarViewport, new ShipModel(StarViewport));
+            shipController.StatusChanged += (sender, e) => ShowFlightStatus();
+            shipController.StatusChanged += (sender, e) => ShowOrHideHud();
+            shipController.AutopilotArrived += ShipController_AutopilotArrived;
             Loaded += MainWindow_Loaded;
             PreviewKeyDown += MainWindow_PreviewKeyDown;
+            PreviewKeyUp += MainWindow_PreviewKeyUp;
+            Deactivated += (sender, e) => shipController.ReleaseAllKeys();
+
+            // Clicking the 3D view takes the keyboard away from the search box, so the ship and
+            // camera keys work again.
+            StarViewport.PreviewMouseDown += (sender, e) =>
+            {
+                if (SearchBox.IsKeyboardFocusWithin)
+                {
+                    MoveKeyboardOffSearchBox();
+                }
+            };
+            ShowFlightStatus();
         }
 
         /// <summary>
@@ -87,6 +117,7 @@ namespace StarChart3D
             }
 
             RedrawStars();
+            flightHud = new FlightHud(starCollection);
 
             // Feature 3: start the dust drifting, to give the illusion of slow motion through space.
             dustField.Start();
@@ -144,8 +175,8 @@ namespace StarChart3D
         }
 
         /// <summary>
-        /// Runs when a star in the "Nearby stars" list is clicked: flies the camera to that star.
-        /// The list is only updated when the flight has finished (see CameraAnimator_AnimationCompleted).
+        /// Runs when a star in the "Nearby stars" list is clicked: flies the camera to that star, or in
+        /// flight mode makes it the ship's target (see ChooseStar).
         /// While the camera is already flying, the click is ignored and the selection is cleared.
         /// </summary>
         private void NearbyStarsList_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
@@ -155,15 +186,139 @@ namespace StarChart3D
                 return; // nothing selected, e.g. after the selection was cleared below
             }
 
-            if (cameraAnimator.IsAnimating)
+            if (!ChooseStar(clicked.Star))
             {
                 NearbyStarsList.SelectedItem = null;
+            }
+        }
+
+        /// <summary>
+        /// Called when a star is chosen in the Nearby stars list or the search.
+        /// In flight mode the star becomes the ship's target (press T for the autopilot);
+        /// otherwise the camera flies there as before.
+        /// </summary>
+        /// <param name="star">The chosen star.</param>
+        /// <returns>False if nothing happened because the camera is already flying to a star.</returns>
+        private bool ChooseStar(Star star)
+        {
+            if (shipController.IsFlightModeOn)
+            {
+                shipController.SetTarget(star);
+                return true;
+            }
+
+            return FlyToStar(star);
+        }
+
+        /// <summary>
+        /// Runs when the autopilot has stopped the ship near its target: that star becomes the current
+        /// star and the "Nearby stars" list is filled for it. The ship stays in flight mode.
+        /// </summary>
+        private void ShipController_AutopilotArrived(object? sender, Star target)
+        {
+            currentStar = target;
+            ShowNearbyStars(target);
+        }
+
+        /// <summary>
+        /// Flies the camera to a star. When the flight ends, the star becomes the current star and the
+        /// "Nearby stars" list updates (see CameraAnimator_AnimationCompleted). Used by the Nearby stars
+        /// list and the star search.
+        /// </summary>
+        /// <param name="star">The star to fly to.</param>
+        /// <returns>False if the camera is already flying, so nothing was started.</returns>
+        private bool FlyToStar(Star star)
+        {
+            if (cameraAnimator.IsAnimating)
+            {
+                return false;
+            }
+
+            // The ship and the flight to a star would both move the camera, so leave flight mode first.
+            shipController.Stop();
+
+            destinationStar = star;
+            cameraAnimator.AnimateTo(new Point3D(star.X, star.Y, star.Z), StarViewDistance, FlightSeconds);
+            return true;
+        }
+
+        /// <summary>
+        /// Runs whenever the text in the search box changes: shows up to 8 matching stars under the
+        /// box, each with the route from the current star, or hides the list if there are none.
+        /// </summary>
+        private void SearchBox_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e)
+        {
+            List<Star> matches = starCollection.SearchByName(SearchBox.Text, SearchResultCount);
+
+            SearchResultsList.ItemsSource = matches
+                .Select(star => new NearbyStar(
+                    star,
+                    CatalogueNames.GetDisplayName(star),
+                    currentStar == null ? string.Empty : Navigation.GetRoute(currentStar, star).ToDisplayString()))
+                .ToList();
+
+            SearchResultsList.Visibility = matches.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        /// <summary>
+        /// Enter in the search box flies to the first match; Esc clears the box and gives the keyboard
+        /// back to the ship and camera keys.
+        /// </summary>
+        private void SearchBox_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Enter && SearchResultsList.Items.Count > 0)
+            {
+                SearchResultsList.SelectedIndex = 0; // the same as clicking the first match
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Escape)
+            {
+                ClearSearch();
+                e.Handled = true;
+            }
+        }
+
+        /// <summary>
+        /// Runs when a match in the search list is clicked: flies to that star (or makes it the ship's
+        /// target in flight mode), then clears the search.
+        /// </summary>
+        private void SearchResultsList_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+        {
+            if (SearchResultsList.SelectedItem is not NearbyStar clicked)
+            {
                 return;
             }
 
-            destinationStar = clicked.Star;
-            Star star = clicked.Star;
-            cameraAnimator.AnimateTo(new Point3D(star.X, star.Y, star.Z), StarViewDistance, FlightSeconds);
+            if (ChooseStar(clicked.Star))
+            {
+                ClearSearch();
+            }
+            else
+            {
+                SearchResultsList.SelectedItem = null; // the camera is already flying: ignore the click
+            }
+        }
+
+        /// <summary>
+        /// Empties the search box, hides the matches and moves the keyboard back to the window.
+        /// </summary>
+        private void ClearSearch()
+        {
+            SearchBox.Text = string.Empty; // this also hides the list, through SearchBox_TextChanged
+            MoveKeyboardOffSearchBox();
+        }
+
+        /// <summary>
+        /// Takes the keyboard away from the search box and gives it to the window, so the ship and
+        /// camera keys work again. If the window can't take it, the keyboard focus is just cleared.
+        /// </summary>
+        private void MoveKeyboardOffSearchBox()
+        {
+            Keyboard.Focus(this);
+            if (SearchBox.IsKeyboardFocusWithin)
+            {
+                Keyboard.ClearFocus();
+            }
         }
 
         /// <summary>
@@ -183,15 +338,129 @@ namespace StarChart3D
         }
 
         /// <summary>
-        /// Runs when a key is pressed anywhere in the window. Camera keys are passed to the
-        /// keyboard controller; if it uses the key, the key is marked as handled.
-        /// While the camera is flying, camera keys are ignored so they don't fight the animation.
+        /// Runs when a key is pressed anywhere in the window. Keys typed into the search box are left alone.
+        /// F turns flight mode on and off (not while the camera is flying to a star).
+        /// In flight mode, ship keys go to the ShipController; otherwise camera keys go to the
+        /// keyboard controller as before. While the camera is flying to a star, camera keys are
+        /// ignored so they don't fight the animation.
         /// </summary>
         private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
         {
+            // While typing in the search box, every key goes into the box, not to the ship or camera.
+            if (SearchBox.IsKeyboardFocusWithin)
+            {
+                return;
+            }
+
+            if (e.Key == Key.F)
+            {
+                ToggleFlightMode();
+                e.Handled = true;
+                return;
+            }
+
+            if (shipController.IsFlightModeOn)
+            {
+                if (shipController.HandleKeyDown(e.Key))
+                {
+                    e.Handled = true;
+                }
+
+                return;
+            }
+
             if (!cameraAnimator.IsAnimating && keyboardCameraController.HandleKey(e.Key))
             {
                 e.Handled = true;
+            }
+        }
+
+        /// <summary>
+        /// Runs when a key is let go anywhere in the window, so the ship knows a key is no longer held.
+        /// </summary>
+        private void MainWindow_PreviewKeyUp(object sender, KeyEventArgs e)
+        {
+            if (shipController.HandleKeyUp(e.Key))
+            {
+                e.Handled = true;
+            }
+        }
+
+        /// <summary>
+        /// Turns flight mode on or off. It can't be turned on while the camera is flying to a star.
+        /// </summary>
+        private void ToggleFlightMode()
+        {
+            if (shipController.IsFlightModeOn)
+            {
+                shipController.Stop();
+            }
+            else if (!cameraAnimator.IsAnimating)
+            {
+                shipController.Start();
+            }
+        }
+
+        /// <summary>
+        /// Shows the HUD and crosshair while flight mode is on, and hides them when it is off.
+        /// While shown, the HUD is updated once per screen frame (CompositionTarget.Rendering).
+        /// </summary>
+        private void ShowOrHideHud()
+        {
+            bool show = shipController.IsFlightModeOn && flightHud != null;
+
+            HudPanel.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+            Crosshair.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+
+            if (show && !isHudUpdating)
+            {
+                CompositionTarget.Rendering += UpdateHud;
+                isHudUpdating = true;
+                UpdateHud(this, EventArgs.Empty);
+            }
+            else if (!show && isHudUpdating)
+            {
+                CompositionTarget.Rendering -= UpdateHud;
+                isHudUpdating = false;
+            }
+        }
+
+        /// <summary>
+        /// Puts the latest HUD text on screen, from where the camera is, where it looks and the ship's speed.
+        /// </summary>
+        private void UpdateHud(object? sender, EventArgs e)
+        {
+            if (flightHud == null)
+            {
+                return;
+            }
+
+            // The ship's own position and heading, not the camera's, so the HUD is the same in both views.
+            HudReading reading = flightHud.Read(shipController.ShipPosition, shipController.ShipForward, shipController.Speed,
+                                                shipController.Target, shipController.IsAutopilotOn);
+            HudSpeedText.Text = reading.SpeedText;
+            HudHeadingText.Text = reading.HeadingText;
+            HudNearestText.Text = reading.NearestStarText;
+            HudSunText.Text = reading.SunText;
+            HudTargetText.Text = reading.TargetText;
+        }
+
+        /// <summary>
+        /// Shows whether flight mode is on and the ship's speed in the top-left panel, with the ship
+        /// keys as a reminder while flying.
+        /// </summary>
+        private void ShowFlightStatus()
+        {
+            if (shipController.IsFlightModeOn)
+            {
+                string view = shipController.IsChaseView ? "chase" : "cockpit";
+                FlightStatusText.Text =
+                    $"Flight mode: ON    View: {view}    Speed: {shipController.Speed:0.00} pc/s\n" +
+                    "W/S speed, X stop, arrows pitch/turn, Q/E roll, C view, T autopilot, F exit";
+            }
+            else
+            {
+                FlightStatusText.Text = "Flight mode: OFF (press F to fly)";
             }
         }
 

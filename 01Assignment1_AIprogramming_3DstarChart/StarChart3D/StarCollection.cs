@@ -105,6 +105,61 @@ namespace StarChart3D
         }
 
         /// <summary>
+        /// Finds stars whose display name (from CatalogueNames) contains the search text, ignoring
+        /// upper and lower case (Feature 4). Names that start with the text come first, then the
+        /// rest; within each group the stars closest to the Sun come first.
+        /// </summary>
+        /// <param name="text">Part of a star name, for example "sir".</param>
+        /// <param name="maxResults">The most stars to return.</param>
+        /// <returns>Up to maxResults matching stars. Empty if the text is blank.</returns>
+        public List<Star> SearchByName(string text, int maxResults)
+        {
+            string search = text.Trim();
+            if (search.Length == 0)
+            {
+                return new List<Star>();
+            }
+
+            return stars
+                .Select(star => new { Star = star, Name = CatalogueNames.GetDisplayName(star) })
+                .Where(match => match.Name.Contains(search, StringComparison.OrdinalIgnoreCase))
+                .OrderBy(match => match.Name.StartsWith(search, StringComparison.OrdinalIgnoreCase) ? 0 : 1)
+                .ThenBy(match => match.Star.Distance)
+                .Take(maxResults)
+                .Select(match => match.Star)
+                .ToList();
+        }
+
+        /// <summary>
+        /// Returns the star nearest to a point in space, for example where the ship is (Feature 4).
+        /// </summary>
+        /// <param name="x">The point's x, in parsecs.</param>
+        /// <param name="y">The point's y, in parsecs.</param>
+        /// <param name="z">The point's z, in parsecs.</param>
+        /// <returns>The nearest star, or null if no stars are loaded.</returns>
+        public Star? GetNearestStar(double x, double y, double z)
+        {
+            Star? nearest = null;
+            double nearestDistanceSquared = double.MaxValue;
+
+            foreach (Star star in stars)
+            {
+                double dx = star.X - x;
+                double dy = star.Y - y;
+                double dz = star.Z - z;
+                double distanceSquared = dx * dx + dy * dy + dz * dz;
+
+                if (distanceSquared < nearestDistanceSquared)
+                {
+                    nearestDistanceSquared = distanceSquared;
+                    nearest = star;
+                }
+            }
+
+            return nearest;
+        }
+
+        /// <summary>
         /// Returns the squared distance between two stars, in parsecs squared. The square root is not
         /// needed just to sort by distance, so it is skipped to save time.
         /// </summary>

@@ -835,3 +835,236 @@ this is only a visual effect, not real astronomy.
 
 ### Commit
 Add DustField: drifting space dust that streams past when the camera flies
+
+
+
+## Entry 23 – 2026-11-09, 13:18 – feature4-additional-facilities
+### Prompt
+> Feature 4: add a spaceship flight mode, like the game Elite. Create a new class ShipController
+> in the StarChart3D namespace that flies the 3D camera like a spaceship, using WPF's own frame
+> timing like CameraAnimator. Pressing F turns flight mode on and off. In flight mode: W speeds up,
+> S slows down (it can't go backwards), X stops the ship, the up and down arrows pitch the nose
+> down and up, the left and right arrows turn left and right, and Q and E roll left and right. The
+> ship keeps moving forward at its current speed until it is slowed down. Turning should be smooth
+> while a key is held, not in steps. While flight mode is on, these keys should go to the ship and
+> not to KeyboardCameraController; when it is off, everything works as before. Flight mode can't
+> be turned on while CameraAnimator is flying to a star. Show "Flight mode: ON" or "OFF" and the
+> current speed in parsecs per second somewhere small on screen for now. Don't change
+> StarRenderer, Navigation, CameraAnimator or DustField.
+
+### Response
+Claude wrote ShipController.cs (see this commit):
+- Start() and Stop() turn flight mode on and off; the ship starts and ends at speed 0
+- HandleKeyDown and HandleKeyUp remember which ship keys are held, so turning is smooth; X stops
+  the ship at once
+- every frame (CompositionTarget.Rendering with a Stopwatch): W and S change the speed by 1 pc/s
+  each second, kept between 0 and 5 pc/s; the arrows pitch and turn at 45° per second and Q/E roll
+  at 60° per second, by rotating the camera's look and up directions around the ship's own axes
+  (right, up and forward) with a Quaternion; then the camera moves forward at the current speed
+- a StatusChanged event when the mode or the speed changes
+In MainWindow: F toggles flight mode (not while flying to a star), ship keys go to the ship in
+flight mode and to KeyboardCameraController otherwise, a PreviewKeyUp handler, held keys are
+released when the window loses focus, and a status line under the checkbox. It also turns flight
+mode off when a star in the Nearby list is clicked, because both would move the camera; I didn't
+ask for that, but it makes sense. It checked the turning directions with a small maths test but
+could not build or run it.
+
+Result: pressing F shows "Flight mode: ON  Speed: 0.00 pc/s" and the list of ship keys, and I
+could fly the camera away from the Sun with the ship keys.
+
+### Critique
+This is the start of the big Feature 4 idea from the brief (flying like Elite). The ship code is
+in its own class, and MainWindow only decides where keys go. Holding keys gives smooth turning
+instead of the 5° steps of KeyboardCameraController, and the dust from Feature 3 now makes
+flying feel like real movement.
+
+The speeds and turn rates (5 pc/s, 45°, 60°) were picked by the AI, not tested against other
+values. The real speed of light is far slower than this (1 pc is about 3.26 light years), so this
+is a game speed, not a realistic one. The "Current star" in the Nearby panel doesn't change while
+I fly freely, so there is no way yet to tell where I am, which the HUD in the next step will fix.
+
+### Commit
+Add ShipController: spaceship flight mode with speed, pitch, turn and roll (F to toggle)
+
+
+## Entry 24 – 2026-11-09, 13:31 – feature4-additional-facilities
+### Prompt
+> Feature 4: add a cockpit HUD (heads-up display) for flight mode. Create a new class FlightHud in
+> the StarChart3D namespace that works out, from the camera, what the HUD shows: the ship's speed
+> in parsecs per second and in light years per second, its heading as a bearing and path in
+> degrees (using the same angles as Navigation, from the direction the camera is looking), the
+> nearest star to the ship with its name and distance in light years, and the distance from the
+> Sun in light years. Show the HUD as a panel at the bottom centre of the window, on top of the 3D
+> view, with a small crosshair in the middle of the screen, only while flight mode is on. Update it
+> while flying. The nearest-star search should use StarCollection, not MainWindow. Don't change
+> StarRenderer, Navigation, CameraAnimator or DustField.
+
+### Response
+Claude wrote FlightHud.cs (see this commit):
+- Read(position, lookDirection, speed) returns a HudReading record with four text lines: speed in
+  pc/s and ly/s, heading (bearing and path), nearest star with distance, and distance from Sol
+- every number comes from Navigation.GetRoute: the ship is made into a pretend Star at the camera
+  position, and the heading is the route to a point 1 parsec ahead in the look direction, so the
+  angles are exactly the same as in the Nearby stars list and no maths is repeated
+StarCollection got GetNearestStar(x, y, z), which checks all stars and returns the closest.
+MainWindow.xaml got a green crosshair in the centre and a green Consolas HUD box at the bottom
+centre, both hidden until flight mode is on and not blocking the mouse. MainWindow.xaml.cs creates
+the FlightHud after loading, shows or hides the HUD when flight mode changes, and updates it every
+frame (CompositionTarget.Rendering) while flying. It could not build or run it.
+
+Result: the HUD and crosshair appear when I press F. Looking straight down -z it showed "bearing
+—, path -90.0°", which is right because the bearing can't be worked out straight down. At
+position about -0.365, -0.262, -0.787 it showed "Nearest star: Proxima Centauri, 1.28 ly" and
+"Distance from Sol: 2.96 ly", and the AI checked both numbers against stars.csv.
+
+### Critique
+It works and the numbers are right. Reusing Navigation.GetRoute with a pretend star was a clever
+way to keep the angles the same everywhere, but making a Star that isn't a real star is a bit of
+a trick; a GetRoute that takes two points would be cleaner, but I said not to change Navigation.
+The HUD text and the Nearby stars panel both show "ly", so they are easy to compare.
+
+The nearest-star search checks all 2000 stars every frame; it is fast enough for 2000 but would
+need a better method for the full HYG catalogue. The file was saved as Flighthud.cs with a small
+h, which I fixed in a separate commit. The light years per second number is far faster than
+light, so the speed is for a game, not realistic.
+
+### Commit
+Add cockpit HUD and crosshair for flight mode: speed, heading, nearest star, distance from Sol (FlightHud)
+
+
+## Entry 25 – 2026-11-09, 13:41 – feature4-additional-facilities
+### Prompt
+> Feature 4: add a star search. Put a search box in the top-left panel under the flight status.
+> When I type part of a star's name (for example "sir"), show a short list of up to 8 matching
+> stars under the box, using the same display names as CatalogueNames and ignoring upper/lower
+> case. Clicking a match flies the camera to that star with CameraAnimator, the same way as
+> clicking a star in the Nearby stars list, so that star becomes the current star and the Nearby
+> list updates. Put the search code in StarCollection, not MainWindow. While I am typing in the
+> box, letters like F, W, S, X, Q and E must go into the box and must not control the ship or the
+> camera. Don't change StarRenderer, Navigation, CameraAnimator or DustField.
+
+### Response
+Claude added (see this commit):
+- StarCollection.SearchByName(text, maxResults): matches the CatalogueNames display name,
+  ignoring case; names that start with the text come first, then the rest, closest to the Sun
+  first, up to 8
+- MainWindow.xaml: a "Search stars:" label, a text box and a results list (hidden when there are
+  no matches) in the top-left panel; each match shows the route from the current star
+- MainWindow.xaml.cs: the list updates as I type; clicking a match or pressing Enter flies to it
+  and clears the box; Esc clears the box; while the box has the keyboard, the window's key handler
+  does nothing, so letters go into the box; clicking the 3D view takes the keyboard back
+- it moved the "fly to a star" code into one FlyToStar() method that both the Nearby list and the
+  search use, so they behave the same
+It warned that names with Greek letters are shown as symbols, so "tau" won't find τ Cet.
+
+Result: typing "sir" showed Sirius and clicking it flew there, and the Nearby panel changed to
+"Current star: Sirius". Typing letters like F and W went into the box without turning on flight
+mode.
+
+### Critique
+The search makes the chart much easier to use, because I can go to any of the 2000 stars without
+finding it on screen first. Moving the flight code into FlyToStar() removed repeated code, so the
+two lists can't behave differently.
+
+It works out the display name of every star each time I type a letter, which is fine for 2000
+stars but wasteful; the names could be worked out once after loading. Searching only matches the
+display name, so a star can't be found by its other catalogue names (for example its HIP number
+if it has a proper name), and Greek letters have to be typed as symbols.
+
+### Commit
+Add star search: type part of a name, click a match or press Enter to fly there
+
+
+## Entry 26 – 2026-11-09, 13:48 – feature4-additional-facilities
+### Prompt
+> Feature 4: add a spaceship model and a chase view. Create a new class ShipModel in the
+> StarChart3D namespace that builds a simple spaceship 3D model from HelixToolkit shapes (for
+> example a body, wings and a glowing engine), small enough to sit between the stars. Pressing C
+> in flight mode switches between the cockpit view (as now) and a chase view, where the camera sits
+> a short distance behind and above the ship and the ship model is visible in front of it,
+> pointing and moving the way the ship flies. The ship model should only be visible in the chase
+> view. The HUD should keep showing the ship's own position and heading in both views. Don't
+> change StarRenderer, Navigation, CameraAnimator or DustField.
+
+### Response
+Claude wrote ShipModel.cs (see this commit): a body (cylinder) with a nose (cone), two wings and
+a tail fin (boxes), a blue canopy and an orange glowing engine (spheres), about 0.09 parsecs
+long, built once pointing along +X; SetPose moves and turns it with one matrix, and IsVisible
+shows or hides it. It checked that every HelixToolkit method it used exists in version 2.27.3.
+
+It changed ShipController so the ship has its own ShipPosition, ShipForward and ShipUp instead of
+being the camera. Each frame it turns and moves the ship, straightens the directions so rounding
+errors don't build up, then PlaceCamera() puts the camera at the ship (cockpit view) or 0.25 pc
+behind and 0.06 pc above it looking just ahead (chase view), and moves the model. C switches
+views; turning flight mode off puts the camera back at the ship. MainWindow creates the model,
+and the HUD now reads the ship's position and heading, not the camera's. The status line shows
+the view.
+
+Result: in the chase view the ship model is in the middle of the screen with the engine nearest
+to me. The camera was at 0, 0.060, 2.250, exactly 0.25 behind and 0.06 above the ship at 0, 0, 2,
+and the HUD still showed 6.52 ly from Sol, where the ship is.
+
+### Critique
+This makes Feature 4 feel like a real space game, like the Elite example in the brief. Giving the
+ship its own position was a bigger change than I expected, because before the camera was the
+ship, but it was needed for a chase view and it made the HUD correct in both views.
+
+The model is built from simple shapes, so it looks basic. Its size and the chase distances
+(0.25 and 0.06 pc) were picked by the AI and only checked by looking at one screenshot. In flight
+mode, mouse dragging is overwritten every frame because the ship controls the camera. The ship
+is 0.09 pc long, which is about 18,000 times the distance from the Earth to the Sun, so it is
+not to scale.
+
+### Commit
+Add ship model and chase view (C): ship has its own position, camera follows behind
+
+
+## Entry 27 – 2026-11-10, 02:06 – feature4-additional-facilities
+### Prompt
+> Feature 4: add a target lock and autopilot to flight mode. In flight mode, choosing a star in the
+> search box or the Nearby stars list should not fly there with CameraAnimator; instead it should
+> become the ship's target and the ship stays in flight mode. Add the target to the HUD: its name,
+> distance in light years, and how far off the nose it is (the angle in degrees between where the
+> ship points and the direction to the target). Pressing T turns the autopilot on and off: when it
+> is on, the ship turns smoothly towards the target at its normal turn rate, speeds up, slows down
+> as it gets close, and stops near the target, then the autopilot turns itself off and the target
+> becomes the current star in the Nearby list. Any steering key pressed while the autopilot is on
+> turns it off. Outside flight mode, choosing a star should still fly there as before. Don't
+> change StarRenderer, Navigation, CameraAnimator or DustField.
+
+### Response
+Claude changed four files:
+- ShipController: a Target star, IsAutopilotOn, SetTarget, ToggleAutopilot (T) and an
+  AutopilotArrived event. Each frame FlyAutopilot turns the ship towards the target at 45° per
+  second, changes speed no faster than W and S would, limits the speed to
+  sqrt(2 × acceleration × distance left) so it can always brake in time, flies slowly while the
+  target is far off the nose, and stops 0.3 pc (about 1 ly) from the star. Any steering or speed
+  key turns the autopilot off.
+- FlightHud: a fifth line with the target name, distance (from Navigation.GetRoute), the angle
+  off the nose (Vector3D.AngleBetween) and the autopilot state.
+- MainWindow.xaml: the target line in yellow so it stands out.
+- MainWindow.xaml.cs: ChooseStar() makes a chosen star the target in flight mode and still flies
+  there with CameraAnimator outside flight mode; when the autopilot arrives, that star becomes the
+  current star and the Nearby list updates.
+Before giving me the code it tested the steering in a simulation. This found a real bug: the last
+step stopped the ship exactly at the arrival distance, and a rounding error meant it never counted
+as "arrived". It fixed this with a tiny tolerance, and then the simulation reached every target,
+including a star behind the ship and 200 random stars from stars.csv.
+
+Result: in flight mode clicking a star made it the target and the yellow HUD line showed its
+distance and angle off the nose. Pressing T flew the ship there; it slowed down, stopped near the
+star, the autopilot switched off and the Nearby panel changed to the new current star.
+
+### Critique
+This ties Feature 4 together: search, the Nearby list, the HUD, the ship and the chase view all
+work with the autopilot. The braking formula sqrt(2 × acceleration × distance) is real physics
+for stopping in time, not a guess. Testing the steering before I ran it found a bug that would
+have made the autopilot never finish, which I might have missed.
+
+The autopilot flies in a straight line and does not avoid other stars on the way. The arrival
+distance (0.3 pc) and the slow-turning rules (45° and 90°) were picked by the AI. Choosing a star
+now does different things in and out of flight mode, which could confuse a new user, so the
+status line and HUD have to explain it.
+
+### Commit
+Add target lock and autopilot (T): choose a star in flight mode, HUD shows target, ship flies there and stops
