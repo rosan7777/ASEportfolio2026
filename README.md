@@ -7,7 +7,7 @@
 # Course: MSc Information Technology
 # Tutor: Duncan Mullier
 
-### [YouTube Demo Link for Assignment1](https://insertYourLinkHere)
+### [YouTube Demo Link for Assignment1](https://youtu.be/1EITdt6M2uM)
 
 ### [YouTube Demo Link for Assignment2](https://insertYourLinkHere)
 
